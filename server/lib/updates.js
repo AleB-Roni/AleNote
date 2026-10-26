@@ -41,8 +41,15 @@ class UpdateStore {
 
   async ghFetch(url, accept) {
     const headers = { 'User-Agent': 'AleNote-Server', Accept: accept || 'application/vnd.github+json' };
-    if (process.env.GITHUB_TOKEN) headers.Authorization = 'Bearer ' + process.env.GITHUB_TOKEN;
-    const res = await fetch(url, { headers, redirect: 'follow', signal: AbortSignal.timeout(10 * 60e3) });
+    // Nur für private Repositories nötig
+    const token = process.env.ALENOTE_GITHUB_TOKEN;
+    if (token && url.startsWith('https://api.github.com/')) headers.Authorization = 'Bearer ' + token;
+    let res = await fetch(url, { headers, redirect: 'follow', signal: AbortSignal.timeout(10 * 60e3) });
+    if (res.status === 401 && headers.Authorization) {
+      delete headers.Authorization;
+      res = await fetch(url, { headers, redirect: 'follow', signal: AbortSignal.timeout(10 * 60e3) });
+    }
+    if (res.status === 403 && res.headers.get('x-ratelimit-remaining') === '0') throw new Error('GitHub-Abfragelimit erreicht – wird später automatisch erneut versucht');
     if (!res.ok) throw new Error(`GitHub antwortet mit ${res.status}${res.status === 404 ? ' (noch kein Release vorhanden?)' : ''}`);
     return res;
   }
