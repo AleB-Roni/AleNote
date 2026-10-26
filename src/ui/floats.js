@@ -1,4 +1,5 @@
-// Frei bewegliche Bilder: verschieben, skalieren, drehen – überall auf der Seite
+// Frei bewegliche Elemente: Bilder (verschieben, skalieren, drehen) und Blöcke wie Tabellen
+// (am Griff verschieben, Breite ändern) – überall auf der Seite
 import { h, uid, clamp } from '../core/utils.js';
 import { icon } from './icons.js';
 
@@ -11,6 +12,7 @@ export class FloatLayer {
     this.selected = null;
     this.onKey = (e) => {
       if (!this.selected || !this.layer.isConnected) return;
+      if (document.activeElement?.closest?.('.float-block')) return;
       if (document.activeElement?.isContentEditable || /INPUT|TEXTAREA/.test(document.activeElement?.tagName)) return;
       if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); this.remove(this.selected); }
       else if (e.key === 'Escape') this.select(null);
@@ -43,7 +45,10 @@ export class FloatLayer {
     this.updateHeight();
   }
 
+  hasBlock(id) { return this.list.some((f) => f.block?.id === id); }
+
   renderItem(f) {
+    if (f.block) return this.renderBlockItem(f);
     const el = h('div.float-item', { dataset: { id: f.id } });
     const img = h('img', { src: f.src, draggable: false, alt: '' });
     img.addEventListener('load', () => { this.updateHeight(); });
@@ -63,6 +68,70 @@ export class FloatLayer {
     return el;
   }
 
+  /** Frei platzierter Block (z.B. Tabelle) mit Griff zum Verschieben */
+  renderBlockItem(f) {
+    const editor = this.editor;
+    const def = editor.def(f.block.type);
+    const el = h('div.float-item.float-block', { dataset: { id: f.id } });
+    const grip = h('div.float-grip', { title: 'Ziehen zum Verschieben' }, icon('grip', 14), h('span', { text: def?.name || 'Block' }));
+    const bar = h('div.float-block-tools', {},
+      this.tool('layers', 'Nach vorne', () => this.toFront(f.id)),
+      this.tool('undo', 'Nach hinten', () => this.toBack(f.id)),
+      this.tool('alignCenter', 'Zurück in den Text', () => this.toBlock(f.id)),
+      this.tool('trash', 'Löschen', () => this.remove(f.id)));
+    const head = h('div.float-head', {}, grip, h('div.flex'), bar);
+    const row = h('div.block', { dataset: { id: f.block.id, type: f.block.type } });
+    const content = h('div.block-content');
+    try { content.append(def.render(f.block, this.blockCtx(f))); }
+    catch (err) { content.append(h('div.block-error', { text: err.message })); }
+    row.append(content);
+    el.append(head, row, h('div.float-handle.rs.e', { title: 'Breite ändern' }));
+    el.addEventListener('pointerdown', (e) => {
+      if (e.target.closest('.float-grip') || e.target.closest('.float-handle')) this.pointerDown(e, f, el);
+      else this.select(f.id);
+    });
+    this.apply(f, el);
+    if (f.id === this.selected) el.classList.add('selected');
+    return el;
+  }
+
+  blockCtx(f) {
+    const base = this.editor.ctx(f.block);
+    return {
+      ...base,
+      floating: true,
+      remove: () => this.remove(f.id),
+      unfloat: () => this.toBlock(f.id),
+      insertAfter: () => {},
+      focusNext: () => false,
+      focusPrev: () => false
+    };
+  }
+
+  rerenderBlock(id) {
+    const f = this.list.find((x) => x.block?.id === id);
+    const old = f && this.layer.querySelector(`.float-item[data-id="${f.id}"]`);
+    if (!old) return;
+    const el = this.renderItem(f);
+    old.replaceWith(el);
+    this.updateHeight();
+    return el;
+  }
+
+  addBlock(block, x, y, w = 480) {
+    const pw = this.page.clientWidth || 800;
+    const f = { id: uid(), block, x: Math.round(x ?? pw / 2 - w / 2), y: Math.round(y ?? (this.editor.root.scrollTop + 120)), w, z: this.maxZ() + 1 };
+    this.list.push(f);
+    const el = this.renderItem(f);
+    el.classList.add('enter');
+    this.layer.append(el);
+    this.select(f.id);
+    this.updateHeight();
+    this.editor.changed(true);
+    requestAnimationFrame(() => el.querySelector('.cell, [contenteditable]')?.focus());
+    return f;
+  }
+
   tool(ic, title, run) {
     const b = h('button.tb-btn', { title }, icon(ic, 14));
     b.addEventListener('pointerdown', (e) => e.stopPropagation());
@@ -76,7 +145,7 @@ export class FloatLayer {
     el.style.top = f.y + 'px';
     el.style.width = f.w + 'px';
     el.style.zIndex = 10 + (f.z || 0);
-    el.firstChild.style.transform = `rotate(${f.rot || 0}deg)`;
+    if (!f.block) el.firstChild.style.transform = `rotate(${f.rot || 0}deg)`;
     el.classList.toggle('shadow', f.shadow !== false);
   }
 
@@ -97,7 +166,7 @@ export class FloatLayer {
     const center = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
     const startAngle = Math.atan2(e.clientY - center.y, e.clientX - center.x);
     const mode = !handle ? 'move' : handle.classList.contains('rot') ? 'rotate' : 'resize';
-    const corner = handle?.classList.contains('sw') ? 'sw' : handle?.classList.contains('ne') ? 'ne' : handle?.classList.contains('nw') ? 'nw' : 'se';
+    const corner = handle?.classList.contains('e') ? 'e' : handle?.classList.contains('sw') ? 'sw' : handle?.classList.contains('ne') ? 'ne' : handle?.classList.contains('nw') ? 'nw' : 'se';
     const ratio = el.offsetHeight / el.offsetWidth || 1;
     el.classList.add('active');
     document.body.classList.add('float-dragging');
@@ -109,8 +178,8 @@ export class FloatLayer {
         f.y = Math.round(Math.max(-200, start.fy + dy));
         if (!ev.altKey) this.snap(f, el);
       } else if (mode === 'resize') {
-        const dir = corner === 'se' || corner === 'ne' ? 1 : -1;
-        const nw = clamp(start.w + dx * dir, 40, 2400);
+        const dir = corner === 'se' || corner === 'ne' || corner === 'e' ? 1 : -1;
+        const nw = clamp(start.w + dx * dir, f.block ? 200 : 40, 2400);
         if (corner === 'sw' || corner === 'nw') f.x = Math.round(start.fx + (start.w - nw));
         if (corner === 'ne' || corner === 'nw') f.y = Math.round(start.fy + (start.w - nw) * ratio);
         f.w = Math.round(nw);
@@ -191,6 +260,7 @@ export class FloatLayer {
       if (row.getBoundingClientRect().top < fy) after = row.dataset.id;
     }
     this.remove(id);
+    if (f.block) { this.editor.insertBlock(f.block, null, after || this.editor.note.blocks.at(-1)?.id, { focus: false }); return; }
     this.editor.insertBlock('image', { src: f.src, width: Math.min(100, Math.round((f.w / this.page.clientWidth) * 100)) }, after || this.editor.note.blocks.at(-1)?.id, { focus: false });
   }
 

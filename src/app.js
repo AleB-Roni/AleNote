@@ -375,6 +375,7 @@ class App {
   registerCoreCommands() {
     const r = this.registry;
     const hasNote = () => !!this.editor?.note;
+    const inTable = () => !!document.activeElement?.closest?.('.table-block');
     const notInField = () => !/INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName) || !!document.activeElement?.closest?.('.editor-scroll');
     r.registerCommand({ id: 'core.newNote', name: 'Neue Notiz', icon: 'filePlus', shortcut: 'Ctrl+N', group: 'Notizen', run: () => this.createNote(this.sidebar.contextFolder()) });
     r.registerCommand({ id: 'core.newFolder', name: 'Neuer Ordner', icon: 'folderPlus', shortcut: 'Ctrl+Shift+N', group: 'Notizen', run: () => this.createFolder(this.sidebar.contextFolder()) });
@@ -392,7 +393,7 @@ class App {
     r.registerCommand({ id: 'core.undo', name: 'Rückgängig', icon: 'undo', shortcut: 'Ctrl+Z', group: 'Bearbeiten', when: () => hasNote() && notInField(), run: () => this.editor.undo() });
     r.registerCommand({ id: 'core.redo', name: 'Wiederholen', icon: 'refresh', shortcut: 'Ctrl+Y', group: 'Bearbeiten', when: () => hasNote() && notInField(), run: () => this.editor.redo() });
     r.registerCommand({ id: 'core.redo2', name: 'Wiederholen (alternativ)', icon: 'refresh', shortcut: 'Ctrl+Shift+Z', group: 'Bearbeiten', hidden: true, when: () => hasNote() && notInField(), run: () => this.editor.redo() });
-    r.registerCommand({ id: 'core.duplicateBlock', name: 'Block duplizieren', icon: 'copy', shortcut: 'Ctrl+D', group: 'Bearbeiten', when: hasNote, run: () => {
+    r.registerCommand({ id: 'core.duplicateBlock', name: 'Block duplizieren', icon: 'copy', shortcut: 'Ctrl+D', group: 'Bearbeiten', when: () => hasNote() && !inTable(), run: () => {
       const id = document.activeElement?.closest?.('.block')?.dataset.id || this.editor.selectedBlockId;
       if (id) this.editor.duplicateBlock(id);
     } });
@@ -408,7 +409,7 @@ class App {
     } });
     r.registerCommand({ id: 'core.deleteNote', name: 'Aktuelle Notiz löschen', icon: 'trash', group: 'Notizen', when: hasNote, run: () => this.deleteItem(this.currentPath, this.editor.title) });
     r.registerCommand({ id: 'core.favorite', name: 'Favorit umschalten', icon: 'star', shortcut: 'Ctrl+Alt+F', group: 'Notizen', when: hasNote, run: () => this.toggleFavorite(this.currentPath) });
-    r.registerCommand({ id: 'core.reload', name: 'AleNote neu laden', icon: 'refresh', shortcut: 'Ctrl+R', group: 'Allgemein', run: async () => { await this.saveNow(); location.reload(); } });
+    r.registerCommand({ id: 'core.reload', name: 'AleNote neu laden', icon: 'refresh', shortcut: 'Ctrl+R', group: 'Allgemein', when: () => !inTable(), run: async () => { await this.saveNow(); location.reload(); } });
     r.registerCommand({ id: 'core.vault', name: 'Vault wechseln', icon: 'vault', group: 'Allgemein', run: () => this.chooseVault() });
     for (let i = 1; i <= 3; i++) {
       r.registerCommand({ id: 'core.h' + i, name: `In Überschrift ${i} umwandeln`, icon: 'h' + i, shortcut: `Ctrl+Alt+${i}`, group: 'Formatieren', when: hasNote, run: () => this.convertFocused('h' + i) });

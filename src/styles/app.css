@@ -685,3 +685,56 @@ body.no-anim *, body.no-anim *::before, body.no-anim *::after { animation-durati
 .update-chip.hidden { display: none; }
 .update-chip.ready { color: #fff; background: linear-gradient(135deg, var(--accent), var(--accent-2)); box-shadow: 0 4px 14px color-mix(in srgb, var(--accent) 40%, transparent); }
 .update-chip.ready:hover { filter: brightness(1.1); }
+
+/* ---------- Tabellen: Excel-Funktionen ---------- */
+.table-block { outline: none; }
+.table-scroll { position: relative; }
+.table .cell.num { text-align: right; font-variant-numeric: tabular-nums; }
+.table .cell.formula { color: var(--text); }
+.table .cell.formula:not(:focus) { background: color-mix(in srgb, var(--accent) 5%, transparent); }
+.table .cell.error:not(:focus) { color: #f26b6b; }
+.table .cell.in-range { background: color-mix(in srgb, var(--accent) 16%, transparent); }
+.table td:focus-within, .table th:focus-within { box-shadow: none; }
+.sel-box { position: absolute; display: none; pointer-events: none; border: 2px solid var(--accent); border-radius: 3px; z-index: 3; transition: left .06s, top .06s, width .06s, height .06s; }
+.table-block:not(.active) .sel-box { opacity: .35; }
+.table-block:not(.active) .fill-handle { display: none; }
+.fill-handle { position: absolute; right: -5px; bottom: -5px; width: 9px; height: 9px; background: var(--accent); border: 2px solid var(--bg); border-radius: 2px; cursor: crosshair; pointer-events: auto; }
+.fill-handle:hover { transform: scale(1.35); }
+.fill-preview { position: absolute; display: none; pointer-events: none; border: 2px dashed var(--accent); border-radius: 3px; z-index: 4; background: color-mix(in srgb, var(--accent) 6%, transparent); }
+.fill-preview::after { content: attr(data-count); position: absolute; right: 0; bottom: -24px; font-size: 11px; padding: 2px 7px; border-radius: 6px; background: var(--accent); color: #fff; white-space: nowrap; }
+body.cell-selecting, body.cell-selecting * { user-select: none !important; cursor: cell !important; }
+body.cell-filling, body.cell-filling * { user-select: none !important; cursor: crosshair !important; }
+
+.table-formulabar { position: absolute; left: 0; top: -34px; display: flex; align-items: center; gap: 8px; height: 28px; max-width: 100%; padding: 0 10px; border-radius: 8px; background: var(--panel); border: 1px solid var(--border); box-shadow: var(--shadow); font-size: 12px; opacity: 0; transform: translateY(4px); pointer-events: none; transition: opacity .15s, transform .2s var(--ease); z-index: 6; backdrop-filter: blur(12px); }
+.table-block.active .table-formulabar { opacity: 1; transform: none; }
+.fb-name { font-weight: 700; color: var(--accent); min-width: 28px; }
+.fb-fx { font-style: italic; color: var(--text-3); font-family: Georgia, serif; }
+.fb-raw { font-family: var(--mono); color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 420px; }
+.fb-raw:empty::before { content: '–'; color: var(--text-3); }
+
+.table-tools { position: absolute; right: 30px; top: -34px; display: flex; gap: 2px; padding: 3px; border-radius: 9px; background: var(--panel); border: 1px solid var(--border); box-shadow: var(--shadow); opacity: 0; pointer-events: none; transition: opacity .15s; z-index: 6; backdrop-filter: blur(12px); }
+.table-block:hover .table-tools, .table-block.active .table-tools { opacity: 1; pointer-events: auto; }
+.table-block.floating .table-tools { display: none; }
+
+.table .col-heads th { background: var(--bg-hover); color: var(--text-3); font-size: 11px; font-weight: 600; text-align: center; padding: 3px 0; cursor: pointer; user-select: none; min-width: 0; }
+.table .col-heads th.active, .table .row-head.active { background: color-mix(in srgb, var(--accent) 22%, transparent); color: var(--text); }
+.table .col-heads th.corner { width: 36px; }
+.table .row-head { width: 36px; min-width: 36px; text-align: center; vertical-align: middle; font-size: 11px; font-weight: 600; color: var(--text-3); background: var(--bg-hover); cursor: pointer; user-select: none; }
+.table col.head-col { width: 36px; }
+.table.with-header .col-heads + tr > *:not(.row-head) { background: var(--bg-hover); font-weight: 600; }
+.table.with-header tr.col-heads + tr > .row-head { font-weight: 600; }
+.table-block.with-heads .table.with-header tr:first-child:not(.col-heads) > * { background: none; font-weight: normal; }
+
+/* Freie Blöcke (z.B. Tabellen) */
+.float-block { cursor: default; background: var(--bg); border-radius: 12px; box-shadow: 0 10px 34px rgba(0,0,0,.28); border: 1px solid var(--border); padding: 4px 12px 10px; }
+.float-block.selected { box-shadow: 0 0 0 2px var(--accent), 0 10px 34px rgba(0,0,0,.28); }
+.float-head { display: flex; align-items: center; height: 30px; margin: 0 -6px 2px; }
+.float-grip { display: flex; align-items: center; gap: 6px; padding: 3px 8px; border-radius: 7px; color: var(--text-3); font-size: 12px; cursor: grab; user-select: none; }
+.float-grip:hover { background: var(--bg-hover); color: var(--text-2); }
+.float-item.active .float-grip { cursor: grabbing; }
+.float-block-tools { display: flex; gap: 1px; opacity: 0; transition: opacity .15s; }
+.float-block:hover .float-block-tools, .float-block.selected .float-block-tools { opacity: 1; }
+.float-block > .block { display: block; padding: 0; }
+.float-block .table-block { margin: 30px 0 4px; }
+.float-handle.e { display: block; right: -6px; top: 50%; margin-top: -18px; width: 8px; height: 36px; border-radius: 6px; cursor: ew-resize; opacity: 0; transition: opacity .15s; }
+.float-block:hover .float-handle.e, .float-block.selected .float-handle.e { opacity: 1; }

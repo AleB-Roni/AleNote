@@ -147,6 +147,7 @@ export class Editor {
   }
 
   rerenderBlock(id, { focus } = {}) {
+    if (this.floats?.hasBlock(id)) return this.floats.rerenderBlock(id);
     const old = this.rowEl(id);
     const block = this.block(id);
     if (!old || !block) return;
@@ -184,9 +185,9 @@ export class Editor {
 
   // ================= Zugriff =================
 
-  block(id) { return this.note?.blocks.find((b) => b.id === id); }
+  block(id) { return this.note?.blocks.find((b) => b.id === id) || this.note?.floats.find((f) => f.block?.id === id)?.block; }
   index(id) { return this.note.blocks.findIndex((b) => b.id === id); }
-  rowEl(id) { return this.blocksEl?.querySelector(`.block[data-id="${id}"]`); }
+  rowEl(id) { return (this.page || this.blocksEl)?.querySelector(`.block[data-id="${id}"]`); }
   mainEditable(id) { return this.rowEl(id)?.querySelector('[data-editable="main"]'); }
   def(type) { return this.registry.blocks.get(type); }
 
@@ -532,6 +533,13 @@ export class Editor {
     });
 
     root.addEventListener('keydown', (e) => this.onKeyDown(e));
+    document.addEventListener('keydown', (e) => {
+      if (!this.selectedBlockId || !this.root.isConnected) return;
+      const active = document.activeElement;
+      if (active && active !== document.body && active !== this.root) return;
+      if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); this.removeBlock(this.selectedBlockId, { animate: true, focusPrev: true }); }
+      else if (e.key === 'Enter') { e.preventDefault(); const id = this.selectedBlockId; this.selectBlock(null); this.focusBlock(id, 'end'); }
+    });
 
     root.addEventListener('paste', (e) => this.onPaste(e));
 

@@ -67,6 +67,13 @@ Die portable EXE kann sich nicht selbst aktualisieren.
 - **Block-Editor**: Text, Überschrift 1–3, Aufzählung, nummerierte Liste, To-do, Zitat, Hinweisbox, Aufklappbar, Code, Tabelle, Bild, Trennlinie, Inhaltsverzeichnis, Fortschrittsbalken
 - **„/“-Befehle**: In einer Zeile `/` tippen und filtern, z.B. `/tab`, `/code`, `/datum`
 - **Markdown-Kürzel**: `#`, `##`, `###`, `-`, `1.`, `[]`, `>`, `!>`, `>>`, ```` ``` ````, `---`
+- **Tabellen wie in Excel**:
+  - Bereiche markieren (ziehen, Shift+Klick, Shift+Pfeile, Spalten-/Zeilenköpfe).
+  - **Ausfüllkästchen** zum Runterziehen: Zahlenreihen, Datum, Wochentage, Monate, „Woche 1 → 2“. Formeln werden angepasst, über das Tabellenende hinaus entstehen neue Zeilen.
+  - Strg+D / Strg+R zum Ausfüllen nach unten/rechts. Kopieren/Einfügen von Bereichen, auch aus Excel, und ein Wert auf alle markierten Felder.
+  - **Formeln** (`=A1*B1`, `=SUMME(B2:B9)`, MITTELWERT, MIN, MAX, ANZAHL, RUNDEN, WENN …) mit Formelleiste.
+  - Sortieren, Summenzeile, Beschriftung A/B/1/2 einblendbar.
+- **Freie Tabellen**: per „Frei bewegen“ oder `/Freie Tabelle` überall auf der Seite platzieren (am Griff ziehen, Breite ändern).
 - **Bilder**: Drag & Drop, Strg+V, Größe per Griff ändern, ausrichten, Lightbox (Doppelklick)
 - **Frei bewegliche Bilder**: Mit **Shift** ablegen oder „Frei bewegen“ wählen. Dann lassen sie sich verschieben, skalieren (4 Ecken), drehen (Shift = 15°-Schritte) und in Ebenen anordnen. Sie rasten an Mitte und Rändern ein (Alt schaltet das aus).
 - **Blöcke**: Am ⋮⋮-Griff ziehen zum Verschieben, Klick öffnet das Menü (Umwandeln, Farbe, Duplizieren, Löschen). Tab/Shift+Tab rückt ein bzw. aus.
