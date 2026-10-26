@@ -55,12 +55,7 @@ Die **installierte** Version (Setup) aktualisiert sich selbst:
 - Gesucht wird beim Start und alle 4 Stunden. Neue Versionen werden im Hintergrund geladen, dann erscheint oben **„Update installieren“**. Ohne Klick wird beim Beenden installiert.
 - In **Einstellungen → Über** siehst du die Version und kannst manuell suchen oder die Automatik abschalten.
 
-**Neue Version veröffentlichen:**
-
-```bash
-git tag v1.2.0
-git push origin v1.2.0
-```
+**Neue Version veröffentlichen:** In `package.json` die `"version"` erhöhen (z.B. `1.2.0`) und auf `main` pushen. Alternativ ein Tag `v1.2.0` pushen.
 
 GitHub baut das Setup und erstellt ein Release. Der Server übernimmt es innerhalb von 6 Stunden automatisch, sofort geht es über **Admin-Konsole → App-Updates → „Jetzt bei GitHub prüfen“**. Danach aktualisieren sich alle verbundenen Apps.
 

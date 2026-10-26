@@ -24,6 +24,20 @@ jobs:
       - name: Abhängigkeiten installieren
         run: npm ci
 
+      - name: Prüfen, ob diese Version schon veröffentlicht ist
+        id: rel
+        shell: bash
+        run: |
+          VER=$(node -p "require('./package.json').version")
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            echo "tag=$GITHUB_REF_NAME" >> "$GITHUB_OUTPUT"; echo "release=true" >> "$GITHUB_OUTPUT"
+          elif [[ "$GITHUB_EVENT_NAME" == "push" && "$GITHUB_REF" == "refs/heads/main" ]] && ! git ls-remote --exit-code --tags origin "refs/tags/v$VER" >/dev/null; then
+            echo "Neue Version $VER → Release wird erstellt"
+            echo "tag=v$VER" >> "$GITHUB_OUTPUT"; echo "release=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "release=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Version aus Tag übernehmen (z.B. v1.2.0 → 1.2.0)
         if: startsWith(github.ref, 'refs/tags/v')
         shell: bash
@@ -42,10 +56,13 @@ jobs:
             dist/latest.yml
           if-no-files-found: error
 
-      - name: Release erstellen (nur bei Tags wie v1.2.0)
-        if: startsWith(github.ref, 'refs/tags/v')
+      - name: Release erstellen (neue Version in package.json oder Tag v*)
+        if: steps.rel.outputs.release == 'true'
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ steps.rel.outputs.tag }}
+          name: AleNote ${{ steps.rel.outputs.tag }}
+          target_commitish: ${{ github.sha }}
           files: |
             dist/*.exe
             dist/*.blockmap
