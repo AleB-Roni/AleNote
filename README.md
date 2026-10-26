@@ -46,6 +46,26 @@ AleNote kann sich mit einem **eigenen AleNote-Server** verbinden (Ordner [`serve
 
 Server starten: `cd server` und `node server.js` (oder `start-server.bat`). Das Admin-Passwort steht beim ersten Start in der Konsole.
 
+## Automatische Updates
+
+Die **installierte** Version (Setup) aktualisiert sich selbst:
+
+- **Mit Server-Konto:** Updates kommen von deinem AleNote-Server (`<server>/updates/`).
+- **Ohne Konto:** Updates kommen direkt aus den GitHub-Releases.
+- Gesucht wird beim Start und alle 4 Stunden. Neue Versionen werden im Hintergrund geladen, dann erscheint oben **„Update installieren“**. Ohne Klick wird beim Beenden installiert.
+- In **Einstellungen → Über** siehst du die Version und kannst manuell suchen oder die Automatik abschalten.
+
+**Neue Version veröffentlichen:**
+
+```bash
+git tag v1.2.0
+git push origin v1.2.0
+```
+
+GitHub baut das Setup und erstellt ein Release. Der Server übernimmt es innerhalb von 6 Stunden automatisch, sofort geht es über **Admin-Konsole → App-Updates → „Jetzt bei GitHub prüfen“**. Danach aktualisieren sich alle verbundenen Apps.
+
+Die portable EXE kann sich nicht selbst aktualisieren.
+
 ## Funktionen
 
 - **Ordnerstruktur**: Ordner/Unterordner, Notizen per Drag & Drop verschieben, Inline-Umbenennen (F2), Favoriten ★, Rechtsklick-Menüs

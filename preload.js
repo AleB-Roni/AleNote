@@ -37,8 +37,13 @@ contextBridge.exposeInMainWorld('alenoteNative', {
   syncNow: call('sync:now'),
   syncStart: call('sync:start'),
   syncResolve: call('sync:resolve'),
+  // Updates
+  appVersion: call('app:version'),
+  updateStatus: call('update:get'),
+  checkUpdate: call('update:check'),
+  installUpdate: call('update:install'),
   on: (channel, fn) => {
-    const allowed = ['sync:status', 'sync:changed', 'sync:conflicts', 'account:authLost'];
+    const allowed = ['sync:status', 'sync:changed', 'sync:conflicts', 'account:authLost', 'update:status'];
     if (!allowed.includes(channel)) return () => {};
     const listener = (_e, payload) => fn(payload);
     ipcRenderer.on(channel, listener);

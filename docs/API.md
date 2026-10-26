@@ -73,3 +73,13 @@ Bilder werden mit `alenote://asset/<name>` referenziert und über `/api/sync/ass
 | GET | `/api/admin/sessions` |
 | DELETE | `/api/admin/sessions/<id>` |
 | GET / PATCH | `/api/admin/settings` |
+
+## App-Updates
+
+| Methode | Pfad | Beschreibung |
+|---|---|---|
+| GET | `/updates/latest.yml` | Update-Info für electron-updater (öffentlich) |
+| GET | `/updates/<datei>` | Setup-EXE / Blockmap (öffentlich, mit Range-Unterstützung) |
+| GET | `/api/admin/updates` | Status (Admin) |
+| POST | `/api/admin/updates/check` | neuestes GitHub-Release übernehmen (Admin) |
+| PUT | `/api/admin/updates/file/<name>` | Datei manuell hochladen (Admin) |

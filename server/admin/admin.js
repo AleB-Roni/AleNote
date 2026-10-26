@@ -101,8 +101,8 @@ async function start() {
 }
 
 // ---------- Navigation ----------
-const pages = { overview, users, sessions, settings, account };
-const titles = { overview: 'Übersicht', users: 'Benutzer', sessions: 'Sitzungen', settings: 'Server-Einstellungen', account: 'Mein Konto' };
+const pages = { overview, users, sessions, updates, settings, account };
+const titles = { overview: 'Übersicht', users: 'Benutzer', sessions: 'Sitzungen', updates: 'App-Updates', settings: 'Server-Einstellungen', account: 'Mein Konto' };
 document.querySelectorAll('nav button').forEach((b) => (b.onclick = () => go(b.dataset.page)));
 
 function go(page) {
@@ -238,6 +238,58 @@ async function sessions(el) {
     toast('Sitzung beendet');
     go('sessions');
   }));
+}
+
+async function updates(el) {
+  const u = await api('GET', '/api/admin/updates');
+  $('#top-actions').innerHTML = '<button class="btn primary" id="check-gh">Jetzt bei GitHub prüfen</button>';
+  $('#check-gh').onclick = async (e) => {
+    e.target.disabled = true;
+    e.target.textContent = 'Lade herunter…';
+    try { const r = await api('POST', '/api/admin/updates/check'); toast(r.version ? `Version ${r.version} ist verfügbar` : 'Kein Release gefunden'); }
+    catch (err) { toast(err.message, true); }
+    go('updates');
+  };
+  el.innerHTML = `
+    <div class="cards">
+      <div class="card"><div class="label">Bereitgestellte Version</div><div class="value">${esc(u.version || '–')}</div><div class="sub">${u.releaseDate ? fmtDate(Date.parse(u.releaseDate)) : 'noch keine'}</div></div>
+      <div class="card"><div class="label">Quelle</div><div class="value" style="font-size:16px;margin-top:12px">${esc(u.source || '–')}</div></div>
+      <div class="card"><div class="label">Letzte Prüfung</div><div class="value" style="font-size:16px;margin-top:12px">${ago(u.lastCheck)}</div><div class="sub" style="color:${u.lastError ? 'var(--red)' : ''}">${esc(u.lastError || (u.checking ? 'läuft…' : 'ok'))}</div></div>
+    </div>
+    <div class="panel"><h3>So funktioniert es</h3>
+      <p class="muted" style="margin:0 0 8px;line-height:1.6">Installierte AleNote-Apps, die mit diesem Server verbunden sind, fragen beim Start und alle 4 Stunden hier nach Updates (<code>${esc(location.origin)}/updates/latest.yml</code>). Sie laden neue Versionen im Hintergrund und fragen dann, ob neu gestartet werden soll.</p>
+    </div>
+    <form class="panel form" id="upd-form" style="max-width:none">
+      <h3 style="margin:0">Automatisch von GitHub übernehmen</h3>
+      <div class="row"><div>Neue Releases automatisch übernehmen<div class="hint">Prüft alle 6 Stunden das neueste GitHub-Release</div></div>${switchEl(u.updateAuto)}</div>
+      <label>GitHub-Repository<input class="in" name="updateRepo" value="${esc(u.updateRepo)}" placeholder="besitzer/repository" /></label>
+      <div><button class="btn primary">Speichern</button></div>
+    </form>
+    <div class="panel"><h3>Manuell hochladen</h3>
+      <p class="muted" style="margin:0 0 12px">Zuerst die Setup-EXE (und optional die .blockmap), danach die <code>latest.yml</code> aus dem Build-Ordner <code>dist/</code> hochladen.</p>
+      <input type="file" id="upd-files" multiple accept=".exe,.yml,.blockmap" />
+      <div id="upd-progress" class="muted" style="margin-top:10px"></div>
+    </div>`;
+  $('#upd-form').onsubmit = async (e) => {
+    e.preventDefault();
+    try {
+      await api('PATCH', '/api/admin/settings', { updateRepo: new FormData(e.target).get('updateRepo'), updateAuto: $('#upd-form .switch').classList.contains('on') });
+      toast('Gespeichert');
+    } catch (err) { toast(err.message, true); }
+  };
+  $('#upd-files').onchange = async (e) => {
+    const files = [...e.target.files].sort((a, b) => (a.name === 'latest.yml') - (b.name === 'latest.yml'));
+    const prog = $('#upd-progress');
+    try {
+      for (const f of files) {
+        prog.textContent = `Lade ${f.name} hoch (${fmtBytes(f.size)})…`;
+        const res = await fetch('/api/admin/updates/file/' + encodeURIComponent(f.name), { method: 'PUT', headers: { Authorization: 'Bearer ' + token }, body: f });
+        if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'Fehler ' + res.status);
+      }
+      toast('Hochgeladen');
+      go('updates');
+    } catch (err) { prog.textContent = ''; toast(err.message, true); }
+  };
 }
 
 async function settings(el) {

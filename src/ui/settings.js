@@ -288,10 +288,11 @@ function vault(app, page) {
   page.append(section('Dateiformat', 'Notizen werden als .alenote (JSON) gespeichert, Bilder im Unterordner _assets. Über "Als Markdown exportieren" kannst du jederzeit exportieren.'));
 }
 
-function about(app, page) {
+function about(app, page, rerender) {
   page.append(h('div.about', {},
     h('div.about-logo', { html: '<svg viewBox="0 0 32 32" width="64" height="64"><defs><linearGradient id="lg2" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="var(--accent)"/><stop offset="1" stop-color="var(--accent-2)"/></linearGradient></defs><rect x="2" y="2" width="28" height="28" rx="8" fill="url(#lg2)"/><path d="M10 22 16 9l6 13M12.5 17h7" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>' }),
     h('h2', { text: 'AleNote' }),
-    h('p.muted', { text: 'Version 1.0.0 – Deine modulare Notiz-App.' }),
+    h('p.muted', { text: `Version ${app.updates?.version || '1.0.0'} – Deine modulare Notiz-App.` }),
     h('p.muted.small', { text: `${app.registry.blocks.size} Blocktypen · ${app.registry.commands.size} Befehle · ${app.plugins.loaded.length} Plugins` })));
+  app.updates?.renderSettings(page, rerender);
 }

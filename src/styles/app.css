@@ -681,3 +681,7 @@ body.no-anim *, body.no-anim *::before, body.no-anim *::after { animation-durati
 .account-empty-icon { width: 52px; height: 52px; border-radius: 14px; display: grid; place-items: center; background: var(--bg-3); color: var(--text-3); }
 .pw-row { display: flex; gap: 8px; }
 .conflict-modal p { margin: 0 0 8px; line-height: 1.5; }
+.update-chip { display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px; border-radius: 13px; font-size: 12px; color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); -webkit-app-region: no-drag; animation: popIn .3s var(--ease); }
+.update-chip.hidden { display: none; }
+.update-chip.ready { color: #fff; background: linear-gradient(135deg, var(--accent), var(--accent-2)); box-shadow: 0 4px 14px color-mix(in srgb, var(--accent) 40%, transparent); }
+.update-chip.ready:hover { filter: brightness(1.1); }

@@ -78,7 +78,8 @@ function createBrowserFallback() {
     accountInfo: () => ok(null),
     changePassword: () => Promise.reject(new Error('Nur in der Desktop-App verfügbar')),
     syncNow: () => ok(), syncStart: () => ok(), syncResolve: () => ok(),
-    on: () => () => {}
+    on: () => () => {},
+    appVersion: () => ok('dev'), updateStatus: () => ok({ state: 'unsupported' }), checkUpdate: () => ok({ state: 'unsupported' }), installUpdate: () => ok()
   };
 }
 

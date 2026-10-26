@@ -16,6 +16,7 @@ import { icon } from './ui/icons.js';
 import { toast, modal, prompt, confirmDialog, contextMenu } from './ui/overlays.js';
 import { welcomeNote } from './welcome.js';
 import { AccountUI } from './ui/account.js';
+import { UpdateUI } from './ui/updates.js';
 
 class App {
   constructor() {
@@ -53,6 +54,8 @@ class App {
 
     this.account = new AccountUI(this);
     await this.account.init();
+    this.updates = new UpdateUI(this);
+    this.updates.init();
 
     const tree = await this.sidebar.refresh();
     if (!tree.length && !this.settings.welcomed) {

@@ -7,6 +7,7 @@ const fs = require('fs/promises');
 const { pathToFileURL } = require('url');
 const os = require('os');
 const { SyncManager } = require('./sync');
+const { Updater } = require('./updater');
 
 const NOTE_EXT = '.alenote';
 const ASSET_DIR = '_assets';
@@ -154,6 +155,7 @@ function handle(channel, fn) {
 
 // ---------- Konto & Synchronisierung ----------
 let sync;
+let updater;
 const notify = (channel, payload) => { if (win && !win.isDestroyed()) win.webContents.send(channel, payload); };
 
 function normalizeServer(url) {
@@ -231,6 +233,13 @@ function registerAccountIpc() {
     const acc = settings.account;
     return serverCall(acc.server, 'POST', '/api/me/password', { oldPassword, newPassword }, acc.token);
   });
+
+  updater = new Updater({ getAccount: () => settings.account, getSettings: () => settings, notify });
+  updater.init();
+  ipcMain.handle('app:version', () => app.getVersion());
+  ipcMain.handle('update:get', () => updater.status);
+  ipcMain.handle('update:check', () => updater.check());
+  ipcMain.handle('update:install', () => updater.install());
 
   ipcMain.handle('sync:now', () => { sync.run(); return sync.status; });
   ipcMain.handle('sync:start', () => sync.start());

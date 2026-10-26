@@ -1,7 +1,7 @@
 {
   "name": "alenote",
   "productName": "AleNote",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "AleNote – moderne, erweiterbare Notiz-App im Stil von Obsidian/Notion",
   "main": "main.js",
   "author": "AleNote",
@@ -25,6 +25,7 @@
       "main.js",
       "preload.js",
       "sync.js",
+      "updater.js",
       "src/**/*",
       "assets/**/*"
     ],
@@ -44,10 +45,20 @@
     },
     "portable": {
       "artifactName": "AleNote-Portable-${version}.exe"
-    }
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "AleB-Roni",
+        "repo": "AleNote"
+      }
+    ]
   },
   "repository": {
     "type": "git",
     "url": "https://github.com/AleB-Roni/AleNote.git"
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.11"
   }
 }

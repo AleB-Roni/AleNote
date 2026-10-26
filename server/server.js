@@ -9,6 +9,7 @@ const crypto = require('crypto');
 const { JsonFile } = require('./lib/store');
 const { Vault } = require('./lib/vault');
 const A = require('./lib/auth');
+const { UpdateStore } = require('./lib/updates');
 
 // Im Docker-Container als PUID/PGID statt als root laufen (z.B. Unraid: 99/100)
 if (process.getuid?.() === 0 && process.env.PUID && process.env.PUID !== '0') {
@@ -27,7 +28,9 @@ const DEFAULT_SETTINGS = {
   sessionDays: 90,
   maxUploadMB: 25,
   defaultQuotaMB: 0, // 0 = unbegrenzt
-  motd: ''
+  motd: '',
+  updateAuto: true, // neue App-Versionen automatisch aus GitHub-Releases übernehmen
+  updateRepo: 'AleB-Roni/AleNote'
 };
 
 const settingsFile = new JsonFile(path.join(DATA, 'settings.json'), DEFAULT_SETTINGS);
@@ -40,6 +43,7 @@ const vaultOf = (userId) => {
 };
 
 const settings = () => ({ ...DEFAULT_SETTINGS, ...settingsFile.data });
+const updates = new UpdateStore(DATA, settings);
 const users = () => usersFile.data.users;
 const findUser = (id) => users().find((u) => u.id === id);
 const findByName = (name) => users().find((u) => u.username.toLowerCase() === String(name || '').toLowerCase());
@@ -63,6 +67,7 @@ async function init() {
     console.log(`    Passwort: ${process.env.ADMIN_PASSWORD ? '(wie in ADMIN_PASSWORD festgelegt)' : password}`);
     console.log('    → Bitte nach dem ersten Login in der Admin-Konsole ändern!\n');
   }
+  await updates.init();
   // Abgelaufene Sitzungen aufräumen
   const now = Date.now();
   for (const [k, s] of Object.entries(sessionsFile.data.sessions)) if (s.expires < now) delete sessionsFile.data.sessions[k];
@@ -339,8 +344,24 @@ route('PATCH', '/api/admin/settings', async (req, ctx) => {
   if (body.maxUploadMB != null) s.maxUploadMB = Math.min(1024, Math.max(1, Number(body.maxUploadMB) || 25));
   if (body.defaultQuotaMB != null) s.defaultQuotaMB = Math.max(0, Number(body.defaultQuotaMB) || 0);
   if (body.motd != null) s.motd = String(body.motd).slice(0, 300);
+  if (body.updateAuto != null) s.updateAuto = !!body.updateAuto;
+  if (body.updateRepo != null) {
+    if (!/^[\w.-]+\/[\w.-]+$/.test(body.updateRepo)) throw A.httpError(400, 'GitHub-Repository im Format besitzer/name angeben');
+    s.updateRepo = body.updateRepo;
+  }
   await settingsFile.save();
   return { settings: settings() };
+});
+
+// ---- Updates (Admin) ----
+route('GET', '/api/admin/updates', async (req, ctx) => {
+  requireAdmin(ctx);
+  return { ...updates.info(), updateAuto: settings().updateAuto, updateRepo: settings().updateRepo, url: '/updates/latest.yml' };
+});
+route('POST', '/api/admin/updates/check', async (req, ctx) => { requireAdmin(ctx); return updates.checkGithub(); });
+route('PUT', '/api/admin/updates/file/:name', async (req, ctx, q, params) => {
+  requireAdmin(ctx);
+  return updates.upload(decodeURIComponent(params.name), await readBody(req, 600 * 1048576));
 });
 
 // ================= Statische Admin-Konsole =================
@@ -374,6 +395,11 @@ const server = http.createServer(async (req, res) => {
   try {
     if (pathname === '/' ) { res.writeHead(302, { Location: '/admin/' }); return res.end(); }
     if (pathname === '/admin' || pathname.startsWith('/admin/')) return await serveAdmin(res, pathname);
+    if (pathname.startsWith('/updates/') && (req.method === 'GET' || req.method === 'HEAD')) return await updates.serve(req, res, decodeURIComponent(pathname.slice(9)));
+    if (pathname === '/api/health') {
+      const h = { ok: true, name: settings().serverName, version: VERSION, allowRegistration: settings().allowRegistration, motd: settings().motd, appVersion: updates.info().version };
+      return send(res, 200, h);
+    }
     for (const r of routes) {
       if (r.method !== req.method) continue;
       const m = pathname.match(r.re);

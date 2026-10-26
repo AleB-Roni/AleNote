@@ -40,6 +40,11 @@ In AleNote unten links auf **Anmelden** klicken. Als Server-Adresse `http://<Unr
 Docker-Tab → **Check for Updates** → **apply update**.
 Die Daten im `appdata`-Ordner bleiben dabei erhalten.
 
+## App-Updates verteilen
+
+Der Server stellt Updates für die AleNote-Desktop-App bereit. Neue GitHub-Releases werden automatisch übernommen (alle 6 Stunden).
+Status, „Jetzt prüfen“ und manuelles Hochladen findest du in der **Admin-Konsole → App-Updates**.
+
 ## Backup
 
 Der Ordner `/mnt/user/appdata/alenote` enthält alles: Benutzer, Einstellungen und Notizen.
