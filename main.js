@@ -5,6 +5,8 @@ const { app, BrowserWindow, ipcMain, dialog, shell, protocol, net } = require('e
 const path = require('path');
 const fs = require('fs/promises');
 const { pathToFileURL } = require('url');
+const os = require('os');
+const { SyncManager } = require('./sync');
 
 const NOTE_EXT = '.alenote';
 const ASSET_DIR = '_assets';
@@ -32,7 +34,8 @@ async function saveSettings() {
 // ---------- Vault ----------
 async function ensureVault() {
   if (!settings.vault) settings.vault = path.join(app.getPath('documents'), 'AleNote');
-  vault = path.resolve(settings.vault);
+  // Angemeldete Konten haben einen eigenen lokalen Ordner
+  vault = path.resolve(settings.account?.vault || settings.vault);
   await fs.mkdir(path.join(vault, ASSET_DIR), { recursive: true });
   await fs.mkdir(path.join(vault, CONFIG_DIR, 'plugins'), { recursive: true });
   await saveSettings();
@@ -138,8 +141,100 @@ function registerProtocol() {
 }
 
 // ---------- IPC ----------
+// Nach diesen Aktionen wird automatisch mit dem Server abgeglichen
+const MUTATING = new Set(['note:write', 'note:create', 'folder:create', 'item:rename', 'item:move', 'item:delete', 'item:duplicate', 'asset:save', 'asset:pick']);
+
 function handle(channel, fn) {
-  ipcMain.handle(channel, async (_e, ...args) => fn(...args));
+  ipcMain.handle(channel, async (_e, ...args) => {
+    const result = await fn(...args);
+    if (MUTATING.has(channel)) sync?.schedule();
+    return result;
+  });
+}
+
+// ---------- Konto & Synchronisierung ----------
+let sync;
+const notify = (channel, payload) => { if (win && !win.isDestroyed()) win.webContents.send(channel, payload); };
+
+function normalizeServer(url) {
+  let u = String(url || '').trim().replace(/\/+$/, '');
+  if (!u) throw new Error('Bitte eine Server-Adresse eingeben');
+  if (!/^https?:\/\//i.test(u)) u = 'http://' + u;
+  return u;
+}
+
+async function serverCall(server, method, url, body, token) {
+  let res;
+  try {
+    res = await fetch(server + url, {
+      method,
+      headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: 'Bearer ' + token } : {}) },
+      body: body ? JSON.stringify(body) : undefined,
+      signal: AbortSignal.timeout(15e3)
+    });
+  } catch { throw new Error('Server nicht erreichbar: ' + server); }
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || 'Fehler ' + res.status);
+  return data;
+}
+
+const publicAccount = () => (settings.account ? (({ token, ...rest }) => rest)(settings.account) : null);
+
+function registerAccountIpc() {
+  sync = new SyncManager({
+    getAccount: () => settings.account,
+    getVault: () => vault,
+    notify,
+    onAuthLost: (msg) => notify('account:authLost', msg)
+  });
+
+  ipcMain.handle('account:get', () => ({ account: publicAccount(), vault, status: sync.status }));
+  ipcMain.handle('account:probe', async (_e, server) => serverCall(normalizeServer(server), 'GET', '/api/health'));
+
+  ipcMain.handle('account:login', async (_e, { server, username, password, register, displayName }) => {
+    server = normalizeServer(server);
+    const device = `AleNote Desktop (${os.hostname()})`;
+    const r = await serverCall(server, 'POST', register ? '/api/register' : '/api/login', { username, password, displayName, device });
+    const host = new URL(server).host.replace(/[^\w.-]/g, '_');
+    sync.stop();
+    settings.account = {
+      server, token: r.token, userId: r.user.id, username: r.user.username, displayName: r.user.displayName, role: r.user.role,
+      serverName: r.server?.name || host,
+      vault: path.join(app.getPath('documents'), 'AleNote Konten', `${r.user.username}@${host}`)
+    };
+    await ensureVault();
+    return publicAccount();
+  });
+
+  ipcMain.handle('account:logout', async () => {
+    const acc = settings.account;
+    sync.stop();
+    if (acc) await serverCall(acc.server, 'POST', '/api/logout', null, acc.token).catch(() => {});
+    settings.account = null;
+    await ensureVault();
+    return true;
+  });
+
+  ipcMain.handle('account:me', async () => {
+    const acc = settings.account;
+    if (!acc) return null;
+    const [me, health] = await Promise.all([
+      serverCall(acc.server, 'GET', '/api/me', null, acc.token),
+      serverCall(acc.server, 'GET', '/api/health').catch(() => ({}))
+    ]);
+    Object.assign(acc, { displayName: me.user.displayName, role: me.user.role, serverName: me.server?.name || acc.serverName });
+    await saveSettings();
+    return { ...me, motd: health.motd || '' };
+  });
+
+  ipcMain.handle('account:password', async (_e, oldPassword, newPassword) => {
+    const acc = settings.account;
+    return serverCall(acc.server, 'POST', '/api/me/password', { oldPassword, newPassword }, acc.token);
+  });
+
+  ipcMain.handle('sync:now', () => { sync.run(); return sync.status; });
+  ipcMain.handle('sync:start', () => sync.start());
+  ipcMain.handle('sync:resolve', (_e, p, choice) => sync.resolve(p, choice));
 }
 
 function registerIpc() {
@@ -296,6 +391,7 @@ else {
     await ensureVault();
     registerProtocol();
     registerIpc();
+    registerAccountIpc();
     createWindow();
   });
   app.on('window-all-closed', () => app.quit());

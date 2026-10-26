@@ -211,6 +211,7 @@ export class Editor {
   changed(immediateCommit = false) {
     if (!this.note) return;
     this.note.updated = Date.now();
+    this.app.dirty = true;
     if (immediateCommit) this.commit(); else this.pushHistory();
     this.app.scheduleSave();
     this.app.events.emit('note:change', this.note, this);

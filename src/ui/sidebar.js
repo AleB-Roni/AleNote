@@ -101,7 +101,8 @@ export class Sidebar {
 
   async refresh() {
     try { this.tree = await this.app.api.tree(); } catch (err) { console.error(err); this.tree = []; }
-    this.app.api.getVault().then((v) => { this.vaultName.textContent = String(v).split(/[\\/]/).pop(); this.vaultName.parentElement.title = 'Vault: ' + v; });
+    if (!this.app.account?.account) this.app.api.getVault().then((v) => { this.vaultName.textContent = String(v).split(/[\\/]/).pop(); if (this.vaultName.parentElement) this.vaultName.parentElement.title = 'Vault: ' + v; });
+    this.app.account?.renderSidebarButton();
     this.renderTree();
     this.renderFavorites();
     this.renderPanels();

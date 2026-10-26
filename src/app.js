@@ -15,6 +15,7 @@ import { openSettings, FONTS, ACCENTS } from './ui/settings.js';
 import { icon } from './ui/icons.js';
 import { toast, modal, prompt, confirmDialog, contextMenu } from './ui/overlays.js';
 import { welcomeNote } from './welcome.js';
+import { AccountUI } from './ui/account.js';
 
 class App {
   constructor() {
@@ -49,6 +50,9 @@ class App {
     this.plugins = new PluginManager(this);
     await this.plugins.loadAll();
     this.hotkeys.syncCustomHotkeys();
+
+    this.account = new AccountUI(this);
+    await this.account.init();
 
     const tree = await this.sidebar.refresh();
     if (!tree.length && !this.settings.welcomed) {

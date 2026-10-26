@@ -27,5 +27,22 @@ contextBridge.exposeInMainWorld('alenoteNative', {
   saveTextFile: call('file:saveText'),
   setTitleBar: call('window:titlebar'),
   openExternal: call('open:external'),
+  // Konto & Synchronisierung
+  getAccount: call('account:get'),
+  probeServer: call('account:probe'),
+  login: call('account:login'),
+  logout: call('account:logout'),
+  accountInfo: call('account:me'),
+  changePassword: call('account:password'),
+  syncNow: call('sync:now'),
+  syncStart: call('sync:start'),
+  syncResolve: call('sync:resolve'),
+  on: (channel, fn) => {
+    const allowed = ['sync:status', 'sync:changed', 'sync:conflicts', 'account:authLost'];
+    if (!allowed.includes(channel)) return () => {};
+    const listener = (_e, payload) => fn(payload);
+    ipcRenderer.on(channel, listener);
+    return () => ipcRenderer.removeListener(channel, listener);
+  },
   platform: process.platform
 });

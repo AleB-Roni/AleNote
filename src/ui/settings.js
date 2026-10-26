@@ -17,6 +17,7 @@ export function openSettings(app, tab = 'appearance') {
     ['appearance', 'Darstellung', 'palette'],
     ['editor', 'Editor', 'edit'],
     ['hotkeys', 'Hotkeys', 'keyboard'],
+    ['account', 'Konto & Sync', 'user'],
     ['plugins', 'Plugins', 'puzzle'],
     ['vault', 'Vault', 'vault'],
     ['about', 'Über', 'star']
@@ -30,7 +31,7 @@ export function openSettings(app, tab = 'appearance') {
     nav.querySelectorAll('.settings-tab').forEach((b) => b.classList.toggle('active', b.dataset.tab === id));
     body.innerHTML = '';
     const page = h('div.settings-page');
-    ({ appearance, editor, hotkeys, plugins, vault, about })[id](app, page, () => show(id), m);
+    ({ appearance, editor, hotkeys, account, plugins, vault, about })[id](app, page, () => show(id), m);
     body.append(page);
     body.scrollTop = 0;
   };
@@ -231,6 +232,10 @@ function hotkeys(app, page, rerender) {
   }
   page.append(table);
   page.append(h('p.muted.small', { html: 'Fest eingebaut: <kbd>Strg</kbd><kbd>B</kbd> Fett · <kbd>Strg</kbd><kbd>I</kbd> Kursiv · <kbd>Strg</kbd><kbd>U</kbd> Unterstrichen · <kbd>Strg</kbd><kbd>E</kbd> Code · <kbd>Strg</kbd><kbd>K</kbd> Link · <kbd>Tab</kbd> Einrücken · <kbd>/</kbd> Befehle' }));
+}
+
+function account(app, page, rerender) {
+  app.account.renderSettings(page, rerender);
 }
 
 function plugins(app, page) {

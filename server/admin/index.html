@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AleNote Admin</title>
+  <link rel="stylesheet" href="admin.css" />
+</head>
+<body>
+  <!-- Anmeldung -->
+  <section id="login" class="login hidden">
+    <form class="login-card" id="login-form">
+      <div class="logo"><svg viewBox="0 0 32 32" width="48" height="48"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#7c5cff"/><stop offset="1" stop-color="#c05cff"/></linearGradient></defs><rect x="2" y="2" width="28" height="28" rx="8" fill="url(#g)"/><path d="M10 22 16 9l6 13M12.5 17h7" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+      <h1>Admin-Konsole</h1>
+      <p class="muted" id="server-name">AleNote Server</p>
+      <label>Benutzername<input name="username" autocomplete="username" required autofocus /></label>
+      <label>Passwort<input name="password" type="password" autocomplete="current-password" required /></label>
+      <div class="error" id="login-error"></div>
+      <button class="btn primary" type="submit">Anmelden</button>
+    </form>
+  </section>
+
+  <!-- Konsole -->
+  <section id="app" class="app hidden">
+    <aside class="side">
+      <div class="brand"><svg viewBox="0 0 32 32" width="24" height="24"><defs><linearGradient id="g2" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#7c5cff"/><stop offset="1" stop-color="#c05cff"/></linearGradient></defs><rect x="2" y="2" width="28" height="28" rx="8" fill="url(#g2)"/><path d="M10 22 16 9l6 13M12.5 17h7" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><span>AleNote Admin</span></div>
+      <nav>
+        <button data-page="overview" class="active">📊 Übersicht</button>
+        <button data-page="users">👥 Benutzer</button>
+        <button data-page="sessions">🔑 Sitzungen</button>
+        <button data-page="settings">⚙️ Einstellungen</button>
+        <button data-page="account">🙂 Mein Konto</button>
+      </nav>
+      <div class="side-foot">
+        <div class="me" id="me"></div>
+        <button class="btn ghost small" id="logout">Abmelden</button>
+      </div>
+    </aside>
+    <main class="main">
+      <header class="top"><h2 id="page-title">Übersicht</h2><div id="top-actions"></div></header>
+      <div id="page" class="page"></div>
+    </main>
+  </section>
+
+  <div id="toast" class="toast"></div>
+  <script src="admin.js"></script>
+</body>
+</html>

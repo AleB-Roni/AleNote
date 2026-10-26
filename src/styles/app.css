@@ -645,3 +645,39 @@ body.no-anim *, body.no-anim *::before, body.no-anim *::after { animation-durati
 @media (max-width: 900px) {
   .page { padding-left: 48px; padding-right: 24px; }
 }
+
+/* ---------- Konto & Sync ---------- */
+.sync-chip { display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px; border-radius: 13px; font-size: 12px; color: var(--text-3); background: var(--bg-hover); transition: background .15s, color .15s; -webkit-app-region: no-drag; }
+.sync-chip:hover { color: var(--text); }
+.sync-chip.ok { color: #3ecf8e; background: rgba(62,207,142,.1); }
+.sync-chip.warn { color: #f0a05a; background: rgba(240,160,90,.12); }
+.sync-chip.err { color: #f26b6b; background: rgba(242,107,107,.12); }
+.sync-chip.spin .icon { animation: spin 1s linear infinite; }
+.sync-chip.static { cursor: default; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.mini-avatar { width: 18px; height: 18px; border-radius: 50%; display: grid; place-items: center; font-size: 10px; font-weight: 700; color: #fff; flex-shrink: 0; }
+.vault-btn { max-width: 130px; }
+.login-modal .modal-header { padding: 8px 10px 0; justify-content: flex-end; }
+.login-modal .modal-header h3 { display: none; }
+.login-form { display: flex; flex-direction: column; gap: 12px; padding-bottom: 6px; }
+.login-hero { display: flex; gap: 14px; align-items: flex-start; margin-bottom: 6px; }
+.login-hero > .icon { width: 50px; height: 50px; border-radius: 14px; background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #fff; box-shadow: 0 8px 22px color-mix(in srgb, var(--accent) 40%, transparent); }
+.login-title { font-size: 17px; font-weight: 700; margin-bottom: 3px; }
+.login-field { display: flex; flex-direction: column; gap: 5px; font-size: 12.5px; color: var(--text-2); }
+.login-field.hidden, .link-btn.hidden { display: none; }
+.login-server-info { display: flex; align-items: center; gap: 4px; margin-top: -6px; min-height: 16px; }
+.login-server-info.ok { color: #3ecf8e; }
+.login-server-info.err { color: #f26b6b; }
+.login-error { color: #f26b6b; font-size: 13px; min-height: 16px; }
+.login-actions { display: flex; align-items: center; gap: 8px; }
+.login-submit { min-width: 130px; justify-content: center; }
+.login-submit:disabled { opacity: .7; cursor: wait; }
+.link-btn { color: var(--accent); font-size: 13px; }
+.link-btn:hover { text-decoration: underline; }
+.account-card { display: flex; align-items: center; gap: 14px; padding: 16px; border-radius: 14px; background: var(--bg); border: 1px solid var(--border); }
+.big-avatar { width: 52px; height: 52px; border-radius: 50%; display: grid; place-items: center; font-size: 22px; font-weight: 700; color: #fff; flex-shrink: 0; }
+.account-name { font-weight: 600; font-size: 15px; display: flex; gap: 8px; align-items: center; }
+.account-actions { display: flex; flex-direction: column; gap: 6px; }
+.account-empty-icon { width: 52px; height: 52px; border-radius: 14px; display: grid; place-items: center; background: var(--bg-3); color: var(--text-3); }
+.pw-row { display: flex; gap: 8px; }
+.conflict-modal p { margin: 0 0 8px; line-height: 1.5; }

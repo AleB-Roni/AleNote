@@ -26,6 +26,24 @@ Bei einem Tag wie `v1.0.0` landet sie zusätzlich unter **Releases**.
 Notizen liegen als Dateien im **Vault** (Standard: `Dokumente\AleNote`). Ordner in der App sind echte Ordner auf der Festplatte.
 Bilder landen in `_assets`. Plugins liegen in `.alenote\plugins`.
 
+## Server, Konten & Synchronisierung
+
+AleNote kann sich mit einem **eigenen AleNote-Server** verbinden (Ordner [`server/`](server/README.md)):
+
+- **Mehrere Benutzer**, jeder mit eigenem, getrenntem Notiz-Speicher
+- **Web-Admin-Konsole** unter `http://<server>:8787/admin`: Benutzer anlegen, Rollen, Speicher-Kontingente, Sitzungen, Server-Einstellungen
+- **In AleNote anmelden**: unten links auf **Anmelden** klicken, dann Server, Benutzername und Passwort eingeben. Über das Profil-Menü lässt sich auch das **Konto wechseln** oder **abmelden**.
+- **Lokal zuerst**: Jede Notiz wird sofort lokal gespeichert, die App funktioniert auch offline. Danach fragt AleNote beim Server nach Änderungen, lädt neue Versionen herunter und eigene Änderungen hoch. Das passiert nach jeder Änderung, alle 30 Sekunden und beim Wechsel ins Fenster.
+- **Konflikte**: Wurde eine Notiz auf zwei Geräten gleichzeitig geändert, fragt AleNote, welche Version gelten soll: **Meine**, **Server** oder **beide behalten**.
+- Jedes Konto hat einen eigenen lokalen Ordner (`Dokumente\AleNote Konten\<benutzer>@<server>`).
+- Die [Server-API](docs/API.md) ist dokumentiert und dient als Grundlage für eine **Handy-App**.
+
+| | |
+|---|---|
+| ![Anmelden](docs/screenshots/9-Anmelden.png) | ![Admin-Konsole](docs/screenshots/11-Admin-Benutzer.png) |
+
+Server starten: `cd server` und `node server.js` (oder `start-server.bat`). Das Admin-Passwort steht beim ersten Start in der Konsole.
+
 ## Funktionen
 
 - **Ordnerstruktur**: Ordner/Unterordner, Notizen per Drag & Drop verschieben, Inline-Umbenennen (F2), Favoriten ★, Rechtsklick-Menüs
@@ -95,7 +113,10 @@ Voreingestellt sind: `Strg+Shift+D` Datum · `Strg+Shift+U` Uhrzeit · `Strg+Alt
 ## Projektstruktur
 
 ```
-main.js              Electron-Hauptprozess (Fenster, Dateien, Vault, Protokoll alenote://)
+main.js              Electron-Hauptprozess (Fenster, Dateien, Vault, Protokoll alenote://, Konten)
+sync.js              Synchronisierung mit dem AleNote-Server
+server/              Sync-Server + Admin-Konsole (eigenständig, ohne Abhängigkeiten)
+docs/API.md          Server-API (Grundlage für Handy-App)
 preload.js           sichere Brücke zur Oberfläche
 src/
   app.js             Start, Layout, Notiz-Verwaltung, eingebaute Befehle, Plugin-API

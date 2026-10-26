@@ -69,7 +69,16 @@ function createBrowserFallback() {
       a.click(); return ok(name);
     },
     setTitleBar: () => ok(),
-    openExternal: (url) => { window.open(url, '_blank'); return ok(); }
+    openExternal: (url) => { window.open(url, '_blank'); return ok(); },
+    // Konto & Sync gibt es nur in der Desktop-App
+    getAccount: () => ok({ account: null, status: { state: 'off' } }),
+    probeServer: () => Promise.reject(new Error('Nur in der Desktop-App verfügbar')),
+    login: () => Promise.reject(new Error('Nur in der Desktop-App verfügbar')),
+    logout: () => ok(true),
+    accountInfo: () => ok(null),
+    changePassword: () => Promise.reject(new Error('Nur in der Desktop-App verfügbar')),
+    syncNow: () => ok(), syncStart: () => ok(), syncResolve: () => ok(),
+    on: () => () => {}
   };
 }
 
