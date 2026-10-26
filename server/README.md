@@ -52,11 +52,12 @@ notizen.example.de {
 }
 ```
 
+Für **Unraid** gibt es ein fertiges Template, siehe [`../unraid/README.md`](../unraid/README.md).
+
 Alternativ mit Docker:
 
 ```bash
-docker build -t alenote-server server/
-docker run -d -p 8787:8787 -v alenote-data:/data --name alenote alenote-server
+docker run -d -p 8787:8787 -v alenote-data:/data --name alenote ghcr.io/aleb-roni/alenote-server:latest
 docker logs alenote   # zeigt das Admin-Passwort beim ersten Start
 ```
 

@@ -1,0 +1,28 @@
+<?xml version="1.0"?>
+<Container version="2">
+  <Name>AleNote-Server</Name>
+  <Repository>ghcr.io/aleb-roni/alenote-server:latest</Repository>
+  <Registry>https://github.com/AleB-Roni/AleNote/pkgs/container/alenote-server</Registry>
+  <Network>bridge</Network>
+  <MyIP/>
+  <Shell>sh</Shell>
+  <Privileged>false</Privileged>
+  <Support>https://github.com/AleB-Roni/AleNote/issues</Support>
+  <Project>https://github.com/AleB-Roni/AleNote</Project>
+  <Overview>Sync-Server für AleNote – die erweiterbare Notiz-App. Mehrere Benutzer mit eigenem Speicher, Web-Admin-Konsole (Benutzer anlegen, Kontingente, Sitzungen, Einstellungen) und automatische Synchronisierung zwischen Desktop-App und künftiger Handy-App.[br][br]Beim ersten Start wird ein Admin-Konto angelegt. Ist kein Admin-Passwort gesetzt, steht ein zufälliges Passwort im Container-Log.</Overview>
+  <Category>Productivity: Tools: Network:Web</Category>
+  <WebUI>http://[IP]:[PORT:8787]/admin/</WebUI>
+  <TemplateURL>https://raw.githubusercontent.com/AleB-Roni/AleNote/main/unraid/alenote-server.xml</TemplateURL>
+  <Icon>https://raw.githubusercontent.com/AleB-Roni/AleNote/main/assets/icon.png</Icon>
+  <ExtraParams/>
+  <PostArgs/>
+  <CPUset/>
+  <Requires/>
+  <Config Name="WebUI / API Port" Target="8787" Default="8787" Mode="tcp" Description="Port für Admin-Konsole und AleNote-App (Server-Adresse in AleNote: http://UNRAID-IP:PORT)" Type="Port" Display="always" Required="true" Mask="false">8787</Config>
+  <Config Name="Daten (appdata)" Target="/data" Default="/mnt/user/appdata/alenote" Mode="rw" Description="Benutzer, Einstellungen und alle Notizen. Diesen Ordner sichern = vollständiges Backup." Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/alenote</Config>
+  <Config Name="Admin-Benutzername" Target="ADMIN_USER" Default="admin" Mode="" Description="Name des Admin-Kontos (nur beim allerersten Start)" Type="Variable" Display="always" Required="false" Mask="false">admin</Config>
+  <Config Name="Admin-Passwort" Target="ADMIN_PASSWORD" Default="" Mode="" Description="Passwort des Admin-Kontos (nur beim allerersten Start). Leer lassen = zufälliges Passwort, steht dann im Log." Type="Variable" Display="always" Required="false" Mask="true"/>
+  <Config Name="PUID" Target="PUID" Default="99" Mode="" Description="Benutzer-ID für Dateien in appdata (Unraid: 99 = nobody)" Type="Variable" Display="advanced" Required="false" Mask="false">99</Config>
+  <Config Name="PGID" Target="PGID" Default="100" Mode="" Description="Gruppen-ID für Dateien in appdata (Unraid: 100 = users)" Type="Variable" Display="advanced" Required="false" Mask="false">100</Config>
+  <Config Name="Zeitzone" Target="TZ" Default="Europe/Berlin" Mode="" Description="Zeitzone für Log-Ausgaben" Type="Variable" Display="advanced" Required="false" Mask="false">Europe/Berlin</Config>
+</Container>

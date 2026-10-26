@@ -42,6 +42,8 @@ AleNote kann sich mit einem **eigenen AleNote-Server** verbinden (Ordner [`serve
 |---|---|
 | ![Anmelden](docs/screenshots/9-Anmelden.png) | ![Admin-Konsole](docs/screenshots/11-Admin-Benutzer.png) |
 
+**Unraid:** fertiges Docker-Image `ghcr.io/aleb-roni/alenote-server` samt Template, Anleitung in [`unraid/README.md`](unraid/README.md).
+
 Server starten: `cd server` und `node server.js` (oder `start-server.bat`). Das Admin-Passwort steht beim ersten Start in der Konsole.
 
 ## Funktionen

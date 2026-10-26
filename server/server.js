@@ -10,6 +10,12 @@ const { JsonFile } = require('./lib/store');
 const { Vault } = require('./lib/vault');
 const A = require('./lib/auth');
 
+// Im Docker-Container als PUID/PGID statt als root laufen (z.B. Unraid: 99/100)
+if (process.getuid?.() === 0 && process.env.PUID && process.env.PUID !== '0') {
+  process.setgid(Number(process.env.PGID || process.env.PUID));
+  process.setuid(Number(process.env.PUID));
+}
+
 const PORT = Number(process.env.PORT || 8787);
 const HOST = process.env.HOST || '0.0.0.0';
 const DATA = path.resolve(process.env.DATA_DIR || path.join(__dirname, 'data'));
@@ -54,7 +60,7 @@ async function init() {
     console.log('  ║  Erster Start – Admin-Konto wurde angelegt   ║');
     console.log('  ╚══════════════════════════════════════════════╝');
     console.log(`    Benutzer: ${username}`);
-    console.log(`    Passwort: ${password}`);
+    console.log(`    Passwort: ${process.env.ADMIN_PASSWORD ? '(wie in ADMIN_PASSWORD festgelegt)' : password}`);
     console.log('    → Bitte nach dem ersten Login in der Admin-Konsole ändern!\n');
   }
   // Abgelaufene Sitzungen aufräumen
