@@ -5,6 +5,7 @@
 import { h, uid, debounce, setPath, placeCaret, setCaretOffset, getCaretOffset, isCaretAtStart, isCaretAtEnd,
   isCaretOnFirstLine, isCaretOnLastLine, splitAtCaret, isEmptyHtml, getCaretClientRect, sanitizeHtml, clamp, stripHtml } from '../core/utils.js';
 import { History } from '../core/history.js';
+import { resolveSrc } from '../core/api.js';
 import { icon } from './icons.js';
 import { contextMenu, toast, popover } from './overlays.js';
 import { SlashMenu } from './slashmenu.js';
@@ -60,7 +61,7 @@ export class Editor {
         h('div.cover-actions', {},
           h('button.chip', { onclick: (e) => this.pickCover(e.currentTarget) }, icon('image', 14), 'Ändern'),
           h('button.chip', { onclick: () => { note.cover = null; this.changed(true); this.renderAll(); } }, icon('trash', 14), 'Entfernen')));
-      if (note.cover.type === 'image') cover.style.backgroundImage = `url("${note.cover.src}")`;
+      if (note.cover.type === 'image') cover.style.backgroundImage = `url("${resolveSrc(note.cover.src)}")`;
       else cover.style.background = GRADIENTS[note.cover.value] || note.cover.value;
       this.root.append(cover);
     }

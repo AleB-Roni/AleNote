@@ -83,4 +83,13 @@ function createBrowserFallback() {
   };
 }
 
-export const api = window.alenoteNative || createBrowserFallback();
+// Desktop (Electron) → preload.js · Android (Capacitor) → api-mobile.js · Browser → Simulation
+// Zum Testen der Handy-Version im Browser: index.html?mobile
+const isCapacitor = !!window.Capacitor?.isNativePlatform?.();
+const simulateMobile = new URLSearchParams(location.search).has('mobile');
+
+export const api = window.alenoteNative
+  || (isCapacitor || simulateMobile ? await (await import('./api-mobile.js')).createMobileApi() : createBrowserFallback());
+
+/** Bildquelle für die Anzeige umwandeln (alenote://asset/… auf dem Handy) */
+export const resolveSrc = (src) => (api.resolveSrc ? api.resolveSrc(src) : src);

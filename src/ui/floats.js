@@ -1,6 +1,7 @@
 // Frei bewegliche Elemente: Bilder (verschieben, skalieren, drehen) und Blöcke wie Tabellen
 // (am Griff verschieben, Breite ändern) – überall auf der Seite
 import { h, uid, clamp } from '../core/utils.js';
+import { resolveSrc } from '../core/api.js';
 import { icon } from './icons.js';
 
 export class FloatLayer {
@@ -50,7 +51,7 @@ export class FloatLayer {
   renderItem(f) {
     if (f.block) return this.renderBlockItem(f);
     const el = h('div.float-item', { dataset: { id: f.id } });
-    const img = h('img', { src: f.src, draggable: false, alt: '' });
+    const img = h('img', { src: resolveSrc(f.src), draggable: false, alt: '' });
     img.addEventListener('load', () => { this.updateHeight(); });
     const bar = h('div.float-toolbar', {},
       this.tool('layers', 'Nach vorne', () => this.toFront(f.id)),

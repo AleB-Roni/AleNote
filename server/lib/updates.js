@@ -70,23 +70,10 @@ class UpdateStore {
       const repo = this.getSettings().updateRepo || 'AleB-Roni/AleNote';
       const rel = await (await this.ghFetch(`https://api.github.com/repos/${repo}/releases/latest`)).json();
       const yml = rel.assets?.find((a) => a.name === 'latest.yml');
-      if (!yml) throw new Error(`Release ${rel.tag_name} enthält keine latest.yml`);
-      const text = await (await this.ghFetch(yml.browser_download_url, 'application/octet-stream')).text();
-      const meta = parseLatestYml(text);
-      if (!meta.version || !meta.file || !SAFE_NAME.test(meta.file)) throw new Error('latest.yml ist ungültig');
-      if (meta.version !== st.version || !fs.existsSync(path.join(this.dir, meta.file))) {
-        const exe = rel.assets.find((a) => a.name === meta.file);
-        if (!exe) throw new Error(`Setup-Datei ${meta.file} fehlt im Release`);
-        await this.download(exe.browser_download_url, path.join(this.dir, meta.file));
-        const map = rel.assets.find((a) => a.name === meta.file + '.blockmap');
-        if (map) await this.download(map.browser_download_url, path.join(this.dir, map.name));
-        // latest.yml zuletzt schreiben, damit Clients nie auf eine fehlende Datei zeigen
-        await fsp.writeFile(path.join(this.dir, 'latest.yml.part'), text);
-        await fsp.rename(path.join(this.dir, 'latest.yml.part'), path.join(this.dir, 'latest.yml'));
-        Object.assign(st, { version: meta.version, file: meta.file, releaseDate: meta.releaseDate || rel.published_at, source: `GitHub ${repo} (${rel.tag_name})` });
-        await this.cleanup(meta.file);
-        console.log(`  Update ${meta.version} von GitHub übernommen`);
-      }
+      const androidJson = rel.assets?.find((a) => a.name === 'latest-android.json');
+      if (!yml && !androidJson) throw new Error(`Release ${rel.tag_name} enthält keine Update-Dateien`);
+      if (androidJson) await this.mirrorAndroid(rel, androidJson, repo);
+      if (yml) await this.mirrorWindows(rel, yml, repo);
       st.lastError = null;
     } catch (err) {
       st.lastError = err.message;
@@ -99,9 +86,61 @@ class UpdateStore {
     return this.info();
   }
 
+  /** Windows: latest.yml + Setup-EXE + Blockmap spiegeln */
+  async mirrorWindows(rel, yml, repo) {
+    const st = this.status.data;
+    const text = await (await this.ghFetch(yml.browser_download_url, 'application/octet-stream')).text();
+    const meta = parseLatestYml(text);
+    if (!meta.version || !meta.file || !SAFE_NAME.test(meta.file)) throw new Error('latest.yml ist ungültig');
+    if (meta.version !== st.version || !fs.existsSync(path.join(this.dir, meta.file))) {
+      const exe = rel.assets.find((a) => a.name === meta.file);
+      if (!exe) throw new Error(`Setup-Datei ${meta.file} fehlt im Release`);
+      await this.download(exe.browser_download_url, path.join(this.dir, meta.file));
+      const map = rel.assets.find((a) => a.name === meta.file + '.blockmap');
+      if (map) await this.download(map.browser_download_url, path.join(this.dir, map.name));
+      // latest.yml zuletzt schreiben, damit Clients nie auf eine fehlende Datei zeigen
+      await fsp.writeFile(path.join(this.dir, 'latest.yml.part'), text);
+      await fsp.rename(path.join(this.dir, 'latest.yml.part'), path.join(this.dir, 'latest.yml'));
+      Object.assign(st, { version: meta.version, file: meta.file, releaseDate: meta.releaseDate || rel.published_at, source: `GitHub ${repo} (${rel.tag_name})` });
+      await this.cleanup(meta.file);
+      console.log(`  Update ${meta.version} von GitHub übernommen`);
+    }
+  }
+
+  /** Android: latest-android.json + APK spiegeln */
+  async mirrorAndroid(rel, asset, repo) {
+    const st = this.status.data;
+    const info = await (await this.ghFetch(asset.browser_download_url, 'application/octet-stream')).json();
+    if (!info.version || !info.file || !SAFE_NAME.test(info.file) || !info.file.endsWith('.apk')) throw new Error('latest-android.json ist ungültig');
+    if (info.version === st.androidVersion && fs.existsSync(path.join(this.dir, info.file))) return;
+    const apk = rel.assets.find((a) => a.name === info.file);
+    if (!apk) throw new Error(`APK ${info.file} fehlt im Release`);
+    await this.download(apk.browser_download_url, path.join(this.dir, info.file));
+    await fsp.writeFile(path.join(this.dir, 'latest-android.json.part'), JSON.stringify(info, null, 2));
+    await fsp.rename(path.join(this.dir, 'latest-android.json.part'), path.join(this.dir, 'latest-android.json'));
+    Object.assign(st, { androidVersion: info.version, androidFile: info.file, androidSource: `GitHub ${repo} (${rel.tag_name})` });
+    await this.cleanupApk(info.file);
+    console.log(`  Android-Update ${info.version} von GitHub übernommen`);
+  }
+
+  async cleanupApk(keep) {
+    for (const f of await fsp.readdir(this.dir)) if (f.endsWith('.apk') && f !== keep) await fsp.rm(path.join(this.dir, f), { force: true });
+  }
+
   /** Manuell hochgeladene Datei speichern (latest.yml, Setup-EXE, Blockmap) */
   async upload(name, buf) {
     if (!SAFE_NAME.test(name)) throw Object.assign(new Error('Ungültiger Dateiname'), { status: 400 });
+    if (name === 'latest-android.json') {
+      let info;
+      try { info = JSON.parse(buf.toString('utf8')); } catch { throw Object.assign(new Error('latest-android.json ist kein gültiges JSON'), { status: 400 }); }
+      if (!info.version || !info.file || !SAFE_NAME.test(info.file)) throw Object.assign(new Error('latest-android.json ist ungültig'), { status: 400 });
+      if (!fs.existsSync(path.join(this.dir, info.file))) throw Object.assign(new Error(`Bitte zuerst ${info.file} hochladen`), { status: 400 });
+      await fsp.writeFile(path.join(this.dir, name), buf);
+      Object.assign(this.status.data, { androidVersion: info.version, androidFile: info.file, androidSource: 'Manuell hochgeladen' });
+      await this.status.save();
+      await this.cleanupApk(info.file);
+      return this.info();
+    }
     if (name === 'latest.yml') {
       const meta = parseLatestYml(buf.toString('utf8'));
       if (!meta.version || !meta.file) throw Object.assign(new Error('latest.yml ist ungültig'), { status: 400 });
@@ -129,8 +168,8 @@ class UpdateStore {
     const file = path.join(this.dir, name);
     let stat;
     try { stat = await fsp.stat(file); } catch { res.writeHead(404, { 'Content-Type': 'text/plain' }); return res.end('Nicht gefunden'); }
-    const type = name.endsWith('.yml') ? 'text/yaml; charset=utf-8' : 'application/octet-stream';
-    const headers = { 'Content-Type': type, 'Accept-Ranges': 'bytes', 'Cache-Control': name.endsWith('.yml') ? 'no-cache' : 'public, max-age=86400' };
+    const type = name.endsWith('.yml') ? 'text/yaml; charset=utf-8' : name.endsWith('.json') ? 'application/json; charset=utf-8' : name.endsWith('.apk') ? 'application/vnd.android.package-archive' : 'application/octet-stream';
+    const headers = { 'Content-Type': type, 'Accept-Ranges': 'bytes', 'Cache-Control': /\.(yml|json)$/.test(name) ? 'no-cache' : 'public, max-age=86400' };
     const range = req.headers.range && /^bytes=(\d*)-(\d*)$/.exec(req.headers.range);
     if (range) {
       let start = range[1] ? Number(range[1]) : stat.size - Number(range[2]);

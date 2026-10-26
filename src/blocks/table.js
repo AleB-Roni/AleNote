@@ -61,7 +61,9 @@ function renderTable(b, ctx) {
   for (let c = 0; c < cols; c++) colgroup.append(h('col', { style: { width: d.widths?.[c] ? d.widths[c] + 'px' : '' } }));
   table.append(colgroup);
 
-  const selBox = h('div.sel-box', {}, h('div.fill-handle', { title: 'Ziehen zum Ausfüllen (Strg = Kopie/Reihe umschalten)' }));
+  const selBox = h('div.sel-box', {},
+    h('div.range-handle', { title: 'Ziehen, um die Markierung zu erweitern' }),
+    h('div.fill-handle', { title: 'Ziehen zum Ausfüllen (Strg = Kopie/Reihe umschalten)' }));
   const fillPreview = h('div.fill-preview');
   const nameEl = h('span.fb-name');
   const rawEl = h('span.fb-raw');
@@ -425,6 +427,25 @@ function renderTable(b, ctx) {
     window.addEventListener('pointermove', move);
     window.addEventListener('pointerup', up);
   });
+  // Runder Griff (vor allem für Touch): Markierung mit dem Finger erweitern
+  selBox.querySelector('.range-handle').addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const g = range();
+    if (!g) return;
+    const anchor = { r: g.r1, c: g.c1 };
+    document.body.classList.add('cell-selecting');
+    wrap.focus({ preventScroll: true });
+    const move = (ev) => { const p = cellAt(ev.clientX, ev.clientY); if (p) setSel(anchor, p); };
+    const up = () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+      document.body.classList.remove('cell-selecting');
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+  });
+
   selBox.querySelector('.fill-handle').addEventListener('dblclick', () => {
     // Doppelklick: bis zum Ende der Tabelle ausfüllen (wie in Excel)
     const g = range();

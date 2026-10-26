@@ -60,10 +60,16 @@ export class UpdateUI {
     modal({
       title: `Update auf Version ${this.status.available}`,
       width: 420,
-      content: h('p.muted', { text: `AleNote wird kurz geschlossen, aktualisiert und danach automatisch neu gestartet. Deine Notizen werden vorher gespeichert. (Aktuell: ${this.version})` }),
+      content: h('p.muted', { text: this.status.platform === 'android'
+        ? `Das Update wird heruntergeladen. Danach fragt Android, ob AleNote aktualisiert werden soll – deine Notizen bleiben erhalten. (Aktuell: ${this.version})`
+        : `AleNote wird kurz geschlossen, aktualisiert und danach automatisch neu gestartet. Deine Notizen werden vorher gespeichert. (Aktuell: ${this.version})` }),
       actions: [
         { label: 'Später', value: null },
-        { label: 'Jetzt neu starten', primary: true, run: async (close) => { close(); await this.app.saveNow(); this.api.installUpdate(); } }
+        { label: this.status.platform === 'android' ? 'Jetzt aktualisieren' : 'Jetzt neu starten', primary: true, run: async (close) => {
+          close();
+          await this.app.saveNow();
+          try { await this.api.installUpdate(); } catch (e) { toast('Update fehlgeschlagen: ' + e.message, { type: 'error', duration: 5000 }); }
+        } }
       ]
     });
   }

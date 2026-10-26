@@ -49,7 +49,7 @@ export class InlineToolbar {
     let x = rect.left + rect.width / 2 - tw / 2;
     x = Math.max(8, Math.min(innerWidth - tw - 8, x));
     let y = rect.top - this.el.offsetHeight - 10;
-    if (y < 48) y = rect.bottom + 10;
+    if (y < 48 || document.body.classList.contains('touch')) y = rect.bottom + 14;
     this.el.style.left = x + 'px';
     this.el.style.top = y + 'px';
     for (const [cmd, q] of [['bold', 'bold'], ['italic', 'italic'], ['underline', 'underline'], ['strike', 'strikeThrough']]) {

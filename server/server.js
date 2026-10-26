@@ -226,6 +226,19 @@ route('DELETE', '/api/sync/note', async (req, ctx, q) => {
 route('PUT', '/api/sync/folder', async (req, ctx) => vaultOf(ctx.user.id).putFolder((await readJson(req)).path));
 route('DELETE', '/api/sync/folder', async (req, ctx, q) => vaultOf(ctx.user.id).remove(q.get('path'), { force: true }));
 
+// Bilder als Base64 (für die Handy-App, deren WebView keine Binärdaten zuverlässig sendet)
+route('GET', '/api/sync/asset64/:name', async (req, ctx, q, params) => {
+  const { buf } = await vaultOf(ctx.user.id).read('asset', decodeURIComponent(params.name));
+  return { data: buf.toString('base64') };
+});
+route('PUT', '/api/sync/asset64/:name', async (req, ctx, q, params) => {
+  const { data } = await readJson(req);
+  if (typeof data !== 'string') throw A.httpError(400, 'data fehlt');
+  const buf = Buffer.from(data, 'base64');
+  if (buf.length > settings().maxUploadMB * 1048576) throw A.httpError(413, 'Datei zu groß');
+  return vaultOf(ctx.user.id).write('asset', decodeURIComponent(params.name), buf, { force: true, quotaBytes: quota(ctx.user) });
+});
+
 route('GET', '/api/sync/asset/:name', async (req, ctx, q, params) => {
   const { buf } = await vaultOf(ctx.user.id).read('asset', decodeURIComponent(params.name));
   return buf;

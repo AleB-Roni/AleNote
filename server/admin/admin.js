@@ -252,12 +252,13 @@ async function updates(el) {
   };
   el.innerHTML = `
     <div class="cards">
-      <div class="card"><div class="label">Bereitgestellte Version</div><div class="value">${esc(u.version || '–')}</div><div class="sub">${u.releaseDate ? fmtDate(Date.parse(u.releaseDate)) : 'noch keine'}</div></div>
+      <div class="card"><div class="label">Windows</div><div class="value">${esc(u.version || '–')}</div><div class="sub">${u.releaseDate ? fmtDate(Date.parse(u.releaseDate)) : 'noch keine'}</div></div>
+      <div class="card"><div class="label">Android</div><div class="value">${esc(u.androidVersion || '–')}</div><div class="sub">${esc(u.androidFile || 'noch keine APK')}</div></div>
       <div class="card"><div class="label">Quelle</div><div class="value" style="font-size:16px;margin-top:12px">${esc(u.source || '–')}</div></div>
       <div class="card"><div class="label">Letzte Prüfung</div><div class="value" style="font-size:16px;margin-top:12px">${ago(u.lastCheck)}</div><div class="sub" style="color:${u.lastError ? 'var(--red)' : ''}">${esc(u.lastError || (u.checking ? 'läuft…' : 'ok'))}</div></div>
     </div>
     <div class="panel"><h3>So funktioniert es</h3>
-      <p class="muted" style="margin:0 0 8px;line-height:1.6">Installierte AleNote-Apps, die mit diesem Server verbunden sind, fragen beim Start und alle 4 Stunden hier nach Updates (<code>${esc(location.origin)}/updates/latest.yml</code>). Sie laden neue Versionen im Hintergrund und fragen dann, ob neu gestartet werden soll.</p>
+      <p class="muted" style="margin:0 0 8px;line-height:1.6">Installierte AleNote-Apps, die mit diesem Server verbunden sind, fragen beim Start und alle 4 Stunden hier nach Updates (<code>${esc(location.origin)}/updates/latest.yml</code> bzw. <code>latest-android.json</code>). Sie laden neue Versionen im Hintergrund und fragen dann, ob neu gestartet werden soll.</p>
     </div>
     <form class="panel form" id="upd-form" style="max-width:none">
       <h3 style="margin:0">Automatisch von GitHub übernehmen</h3>
@@ -266,8 +267,8 @@ async function updates(el) {
       <div><button class="btn primary">Speichern</button></div>
     </form>
     <div class="panel"><h3>Manuell hochladen</h3>
-      <p class="muted" style="margin:0 0 12px">Zuerst die Setup-EXE (und optional die .blockmap), danach die <code>latest.yml</code> aus dem Build-Ordner <code>dist/</code> hochladen.</p>
-      <input type="file" id="upd-files" multiple accept=".exe,.yml,.blockmap" />
+      <p class="muted" style="margin:0 0 12px">Windows: Setup-EXE (+ .blockmap) und <code>latest.yml</code>. Android: APK und <code>latest-android.json</code>. Die Info-Dateien werden automatisch zuletzt hochgeladen.</p>
+      <input type="file" id="upd-files" multiple accept=".exe,.yml,.blockmap,.apk,.json" />
       <div id="upd-progress" class="muted" style="margin-top:10px"></div>
     </div>`;
   $('#upd-form').onsubmit = async (e) => {
@@ -278,7 +279,8 @@ async function updates(el) {
     } catch (err) { toast(err.message, true); }
   };
   $('#upd-files').onchange = async (e) => {
-    const files = [...e.target.files].sort((a, b) => (a.name === 'latest.yml') - (b.name === 'latest.yml'));
+    const isInfo = (f) => f.name === 'latest.yml' || f.name === 'latest-android.json';
+    const files = [...e.target.files].sort((a, b) => isInfo(a) - isInfo(b));
     const prog = $('#upd-progress');
     try {
       for (const f of files) {

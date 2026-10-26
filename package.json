@@ -9,9 +9,17 @@
   "scripts": {
     "start": "electron .",
     "dist": "electron-builder --win",
-    "dist:portable": "electron-builder --win portable"
+    "dist:portable": "electron-builder --win portable",
+    "android:sync": "node -e \"require('fs').copyFileSync('node_modules/@capacitor/core/dist/index.js','src/vendor/capacitor-core.js')\" && npx cap sync android",
+    "android:open": "npx cap open android"
   },
   "devDependencies": {
+    "@capacitor/android": "^8.5.3",
+    "@capacitor/app": "^8.1.2",
+    "@capacitor/cli": "^8.5.3",
+    "@capacitor/core": "^8.5.3",
+    "@capacitor/filesystem": "^8.1.5",
+    "@capacitor/status-bar": "^8.0.4",
     "electron": "^45.0.0",
     "electron-builder": "^26.0.0"
   },

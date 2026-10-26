@@ -1,5 +1,6 @@
 // Bild-, Code-, Trenner- und Inhaltsverzeichnis-Blöcke
 import { h, clamp, stripHtml } from '../core/utils.js';
+import { resolveSrc } from '../core/api.js';
 import { icon } from '../ui/icons.js';
 import { toast, prompt, contextMenu } from '../ui/overlays.js';
 
@@ -30,7 +31,7 @@ export default function registerMediaBlocks(registry) {
         wrap.append(ph);
         return wrap;
       }
-      const img = h('img', { src: b.data.src, draggable: false, alt: stripHtml(b.data.caption) });
+      const img = h('img', { src: resolveSrc(b.data.src), draggable: false, alt: stripHtml(b.data.caption) });
       img.addEventListener('error', () => figure.classList.add('broken'));
       const figure = h('div.image-frame', { style: { width: (b.data.width || 100) + '%' } }, img,
         h('div.img-resize.left'), h('div.img-resize.right'));

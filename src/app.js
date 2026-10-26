@@ -1,5 +1,5 @@
 // AleNote – Start der Oberfläche
-import { api } from './core/api.js';
+import { api, resolveSrc } from './core/api.js';
 import { EventBus } from './core/events.js';
 import { Registry } from './core/registry.js';
 import { PluginManager } from './core/plugins.js';
@@ -17,6 +17,7 @@ import { toast, modal, prompt, confirmDialog, contextMenu } from './ui/overlays.
 import { welcomeNote } from './welcome.js';
 import { AccountUI } from './ui/account.js';
 import { UpdateUI } from './ui/updates.js';
+import { initMobile, isNarrow } from './core/mobile.js';
 
 class App {
   constructor() {
@@ -40,6 +41,7 @@ class App {
     this.registerCoreSlashCommands();
 
     this.buildLayout();
+    initMobile(this);
     this.applySettings();
 
     this.hotkeys = new HotkeyManager(this);
@@ -149,7 +151,11 @@ class App {
     try { await api.setSettings(patch); } catch (err) { console.error(err); }
   }
 
-  toggleSidebar() { this.saveSettings({ sidebarHidden: !this.settings.sidebarHidden }); }
+  toggleSidebar() {
+    // Auf dem Handy ist die Seitenleiste eine ausklappbare Schublade
+    if (isNarrow()) { this.setDrawer?.(!document.body.classList.contains('sidebar-open')); return; }
+    this.saveSettings({ sidebarHidden: !this.settings.sidebarHidden });
+  }
 
   toggleTheme() {
     const cur = this.registry.themes.get(this.settings.theme || 'dark');
@@ -346,7 +352,7 @@ class App {
   }
 
   lightbox(src) {
-    const bd = h('div.lightbox', { onclick: () => { bd.classList.add('leaving'); setTimeout(() => bd.remove(), 200); } }, h('img', { src }));
+    const bd = h('div.lightbox', { onclick: () => { bd.classList.add('leaving'); setTimeout(() => bd.remove(), 200); } }, h('img', { src: resolveSrc(src) }));
     document.body.append(bd);
   }
 
