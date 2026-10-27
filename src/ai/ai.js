@@ -25,6 +25,8 @@ export const DEFAULT_ACTIONS = [
   { id: 'structure', name: 'Seite neu strukturieren', icon: '🧱', scope: 'page', output: 'replace', slash: false, toolbar: false, prompt: 'Strukturiere die gesamte Notiz übersichtlich neu: sinnvolle Überschriften, Absätze und Listen. Behalte alle Informationen.' }
 ];
 
+/** Anzeigename des Bereichs */
+const SCOPE_NAMES = { selection: 'Markierung', block: 'Block', blocks: 'Markierte Blöcke', page: 'Ganze Seite' };
 const SCOPE_LABELS = { auto: 'Automatisch', selection: 'Markierter Text', block: 'Aktueller Block', page: 'Ganze Seite' };
 const OUTPUT_LABELS = { replace: 'Ersetzen', below: 'Darunter einfügen', chat: 'Im Chat anzeigen' };
 export { SCOPE_LABELS, OUTPUT_LABELS };
@@ -95,6 +97,13 @@ export class AIManager {
     if ((scope === 'auto' || scope === 'selection') && hasSelection) {
       return { kind: 'selection', text: sel.toString(), range: sel.getRangeAt(0).cloneRange(), field, blockId: field.closest('.block')?.dataset.id };
     }
+    // Mehrere markierte Blöcke (Ziehen über Blöcke, Shift-/Strg-Klick, Strg+A 2×)
+    const multi = editor.multiSelected;
+    if (multi?.size && scope !== 'page' && (!blockId || multi.has(blockId))) {
+      const blocks = editor.note.blocks.filter((b) => multi.has(b.id));
+      if (blocks.length > 1) return { kind: 'blocks', blockIds: blocks.map((b) => b.id), blockId: blocks.at(-1).id, text: blocksToMarkdown(editor, blocks) };
+      if (blocks.length === 1 && scope !== 'selection') return { kind: 'block', blockId: blocks[0].id, text: blocksToMarkdown(editor, blocks) };
+    }
     if (scope === 'selection') return null;
 
     let id = blockId || document.activeElement?.closest?.('.block')?.dataset.id || editor.selectedBlockId;
@@ -124,7 +133,7 @@ export class AIManager {
       'Antworte in der Sprache des Textes, außer die Anweisung verlangt etwas anderes.',
       format
     ].join('\n');
-    const scopeText = { selection: 'markierter Text', block: 'ein Block der Notiz', page: 'die gesamte Notiz' }[target.kind];
+    const scopeText = { selection: 'markierter Text', block: 'ein Block der Notiz', blocks: 'mehrere markierte Blöcke der Notiz', page: 'die gesamte Notiz' }[target.kind];
     const user = `Anweisung: ${prompt}\n\nNotiz: „${title}“ (${scopeText})\n\nText:\n<<<\n${target.text}\n>>>`;
     return { system, messages: [{ role: 'user', content: user }] };
   }
@@ -176,13 +185,32 @@ export class AIManager {
     if (!blocks.length) return;
 
     if (how === 'below' || target.kind === 'selection') {
-      let after = target.insertAfter || target.blockId || editor.note.blocks.at(-1)?.id;
+      let after = target.insertAfter || (target.kind === 'blocks' ? [...target.blockIds].reverse().find((id) => editor.index(id) >= 0) : target.blockId) || editor.note.blocks.at(-1)?.id;
       if (target.emptySlashBlock && editor.block(target.emptySlashBlock) && !stripHtml(editor.block(target.emptySlashBlock).data.text || '').trim()) {
         // leeren "/"-Block durch das Ergebnis ersetzen
         const idx = editor.index(target.emptySlashBlock);
         editor.note.blocks.splice(idx, 1, ...blocks);
       } else {
         const idx = after ? editor.index(after) + 1 : editor.note.blocks.length;
+        editor.note.blocks.splice(idx, 0, ...blocks);
+      }
+    } else if (target.kind === 'blocks') {
+      // Markierte Blöcke durch das Ergebnis ersetzen (an der Stelle des ersten)
+      const live = target.blockIds.filter((id) => editor.index(id) >= 0);
+      if (!live.length) { toast('Die Blöcke existieren nicht mehr', { type: 'error' }); return; }
+      if (blocks.length === live.length) {
+        // Gleich viele Blöcke zurück → jeder bleibt an seinem Platz (Überschrift, To-do usw. bleiben erhalten)
+        live.forEach((id, k) => {
+          const idx = editor.index(id);
+          const orig = editor.note.blocks[idx];
+          const nb = blocks[k];
+          if (nb.type === 'paragraph' && editor.def(orig.type)?.text && orig.type !== 'code') orig.data.text = nb.data.text;
+          else editor.note.blocks.splice(idx, 1, nb);
+        });
+      } else {
+        const ids = new Set(live);
+        const idx = editor.note.blocks.findIndex((b) => ids.has(b.id));
+        editor.note.blocks = editor.note.blocks.filter((b) => !ids.has(b.id));
         editor.note.blocks.splice(idx, 0, ...blocks);
       }
     } else if (target.kind === 'block') {
@@ -219,14 +247,14 @@ export class AIManager {
     const anchor = h('div', { style: { position: 'fixed', left: rect.left + 'px', top: rect.bottom + 'px', width: '1px', height: '1px' } });
     document.body.append(anchor);
 
-    const scopeLabel = target ? { selection: 'Markierung', block: 'Block', page: 'Ganze Seite' }[target.kind] : '';
+    const scopeLabel = target ? SCOPE_NAMES[target.kind] : '';
     let scope = target?.kind || 'page';
     const input = h('input.ai-bar-input', { placeholder: 'Was soll die KI mit dem Text tun?  (Enter)', spellcheck: 'false' });
     const scopeBtn = h('button.ai-scope', { title: 'Bereich wechseln' }, icon('layers', 13), h('span', { text: scopeLabel }));
     const list = h('div.ai-bar-list');
     const actions = this.cfg.actions;
     let active = 0;
-    const scopes = ['selection', 'block', 'page'].filter((k) => k !== 'selection' || target?.kind === 'selection');
+    const scopes = ['selection', 'blocks', 'block', 'page'].filter((k) => (k !== 'selection' && k !== 'blocks') || target?.kind === k);
 
     const renderList = () => {
       const q = input.value.trim().toLowerCase();
@@ -248,12 +276,12 @@ export class AIManager {
       closeMenu();
       const t = scope === target?.kind ? target : this.captureTarget(scope, opts) || target;
       if (a.custom) this.run({ id: 'custom', name: 'Eigene Anweisung', prompt: input.value.trim(), scope, output: scope === 'selection' ? 'replace' : 'replace' }, { target: t });
-      else this.run(a, { target: a.scope === 'auto' || a.scope === scope ? t : this.captureTarget(a.scope, opts) });
+      else this.run(a, { target: a.scope === 'auto' || a.scope === scope || (t?.kind === 'blocks' && a.scope !== 'page') ? t : this.captureTarget(a.scope, opts) });
     };
     scopeBtn.addEventListener('mousedown', (e) => {
       e.preventDefault();
       scope = scopes[(scopes.indexOf(scope) + 1) % scopes.length];
-      scopeBtn.querySelector('span:last-child').textContent = { selection: 'Markierung', block: 'Block', page: 'Ganze Seite' }[scope];
+      scopeBtn.querySelector('span:last-child').textContent = SCOPE_NAMES[scope];
     });
     input.addEventListener('input', () => { active = 0; renderList(); });
     input.addEventListener('keydown', (e) => {
@@ -278,6 +306,17 @@ export class AIManager {
       { label: 'KI-Befehl …', icon: 'sparkles', shortcut: 'Ctrl+J', run: () => this.openCommandBar({ blockId }) },
       '-',
       ...this.cfg.actions.filter((a) => a.scope !== 'page').map((a) => ({ label: `${a.icon || ''} ${a.name}`.trim(), run: () => this.run(a, { target: this.captureTarget('block', { blockId }) }) }))
+    ];
+  }
+
+  /** Einträge für die Leiste über mehreren markierten Blöcken */
+  multiMenuItems() {
+    const target = this.captureTarget('blocks');
+    return [
+      { header: target?.kind === 'blocks' ? `${target.blockIds.length} Blöcke mit KI bearbeiten` : 'Mit KI bearbeiten' },
+      { label: 'KI-Befehl …', icon: 'sparkles', shortcut: 'Ctrl+J', run: () => this.openCommandBar() },
+      '-',
+      ...this.cfg.actions.filter((a) => a.scope !== 'page').map((a) => ({ label: `${a.icon || ''} ${a.name}`.trim(), run: () => this.run(a, { target }) }))
     ];
   }
 
@@ -310,7 +349,7 @@ class ResultPanel {
       h('button.btn.small', { title: 'Kopieren', onclick: async () => { await navigator.clipboard.writeText(cleanResult(this.text)); toast('Kopiert', { duration: 1000 }); } }, icon('copy', 14)),
       h('div.flex'),
       h('button.btn.small', { onclick: () => this.close() }, 'Verwerfen'));
-    const where = { selection: 'Markierung', block: 'Block', page: 'Ganze Seite' }[this.target.kind];
+    const where = SCOPE_NAMES[this.target.kind];
     this.el = h('div.ai-result', {},
       h('div.ai-result-head', {}, h('span.ai-result-icon', { text: this.action.icon || '✨' }), h('b', { text: this.action.name }),
         h('span.ai-chip', { text: where }), h('span.ai-model', { text: `${p.name.split(' (')[0]} · ${cfg.model}` }), h('div.flex'), this.status,
@@ -330,7 +369,7 @@ class ResultPanel {
 
   markTarget(on) {
     const editor = this.app.editor;
-    const ids = this.target.kind === 'page' ? editor.note.blocks.map((b) => b.id) : [this.target.blockId];
+    const ids = this.target.kind === 'page' ? editor.note.blocks.map((b) => b.id) : this.target.kind === 'blocks' ? this.target.blockIds : [this.target.blockId];
     ids.forEach((id) => editor.rowEl(id)?.classList.toggle('ai-target', on));
   }
 

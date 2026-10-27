@@ -85,6 +85,7 @@ Die portable EXE kann sich nicht selbst aktualisieren.
 - **Rückgängig/Wiederholen** (Strg+Z / Strg+Y), automatisches Speichern
 - **KI-Assistent** (Claude, ChatGPT, Gemini, Mistral, Groq, DeepSeek, Grok, OpenRouter, Ollama, eigene OpenAI-kompatible Server):
   - **Eigene Prompts** festlegen (Einstellungen → KI): Was soll die KI mit dem Text machen, für welchen Bereich (Auswahl, Block, ganze Seite), ob ersetzen oder darunter einfügen. Optional mit eigenem Kürzel, im „/“-Menü und in der Formatierungsleiste.
+  - **Mehrere Blöcke auf einmal**: mit der Maus über mehrere Blöcke ziehen, Shift+Klick (Bereich) oder Strg+Klick (einzelne dazu/weg), auf dem Handy ⋮⋮ → „Mehrere markieren“. Über der Auswahl erscheint eine Leiste mit ✨ KI, Kopieren und Löschen. Strg+J und das Block-Menü gelten dann für alle markierten Blöcke.
   - **KI-Leiste** mit Strg+J, KI-Untermenü am ⋮⋮-Griff jedes Blocks, Vorschau vor dem Übernehmen, alles mit Strg+Z rückgängig.
   - **Chat an der Seite** (✨ oben oder Strg+Shift+J), einklappbar, kennt auf Wunsch die geöffnete Notiz, Antworten lassen sich in die Notiz einfügen.
   - API-Schlüssel bleiben nur auf dem Gerät und werden nicht synchronisiert.

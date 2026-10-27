@@ -131,6 +131,7 @@ class App {
 
   showEmpty() {
     this.closeCalendar();
+    this.editor?.clearMulti();
     this.currentPath = null;
     this.editor.note = null;
     this.editorScroll.innerHTML = '';
@@ -223,6 +224,7 @@ class App {
     if (this.calendar?.isOpen()) return;
     await this.saveNow();
     if (this.drawMode) this.toggleDrawMode(false);
+    this.editor.clearMulti();
     this.currentPath = null;
     this.editor.note = null;
     this.mainEl.classList.remove('has-note');

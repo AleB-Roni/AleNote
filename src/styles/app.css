@@ -1128,3 +1128,17 @@ body.quick-window .quicknote :is(textarea, select, button, input, kbd), body.qui
 .boot-error { max-width: 640px; margin: 10vh auto; padding: 24px; color: var(--text); font-family: var(--font); user-select: text; }
 .boot-error h2 { margin: 0 0 8px; color: var(--c-red, #f27373); }
 .boot-error pre { white-space: pre-wrap; word-break: break-word; background: var(--bg-2); border: 1px solid var(--border); border-radius: 10px; padding: 12px; font-size: 12px; max-height: 50vh; overflow: auto; }
+
+/* Mehrere Blöcke markiert: Aktionsleiste */
+body.block-selecting, body.block-selecting * { user-select: none !important; cursor: default; }
+.multi-bar {
+  position: fixed; z-index: 1500; display: flex; align-items: center; gap: 2px; padding: 4px; border-radius: 12px;
+  background: var(--panel); border: 1px solid var(--border); box-shadow: var(--shadow); backdrop-filter: blur(20px) saturate(1.4);
+  animation: popIn .16s var(--ease); user-select: none;
+}
+.multi-bar button { height: 30px; min-width: 30px; padding: 0 8px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; color: var(--text-2); transition: background .12s, color .12s; }
+.multi-bar button:hover:not(:disabled) { background: var(--bg-hover); color: var(--text); }
+.multi-bar button:disabled { opacity: .4; cursor: default; }
+.multi-bar .multi-ai { color: var(--accent); font-weight: 600; }
+.multi-count { font-size: 12.5px; color: var(--text-2); padding: 0 8px 0 6px; font-variant-numeric: tabular-nums; }
+.multi-sep { width: 1px; height: 18px; background: var(--border); margin: 0 3px; }

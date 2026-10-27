@@ -61,7 +61,7 @@ export class Editor {
 
   renderAll() {
     const { note } = this;
-    this.multiSelected = null;
+    this.clearMulti();
     this.slash.close();
     this.root.innerHTML = '';
     this.root.classList.toggle('full-width', !!note.fullWidth);
@@ -318,19 +318,85 @@ export class Editor {
   // ---------- Alle Blöcke markieren ----------
   selectAllBlocks() {
     if (!this.note?.blocks.length) return;
+    this.selectBlocks(this.note.blocks.map((b) => b.id));
+  }
+
+  /** Mehrere Blöcke markieren (für KI, Kopieren, Löschen) */
+  selectBlocks(ids, { keepMode = false } = {}) {
+    if (!this.note) return;
     this.pushHistory.flush();
     this.selectBlock(null);
-    document.activeElement?.blur?.();
+    if (document.activeElement?.closest?.('.blocks')) document.activeElement.blur();
     window.getSelection().removeAllRanges();
-    this.multiSelected = new Set(this.note.blocks.map((b) => b.id));
-    this.blocksEl.querySelectorAll(':scope > .block').forEach((r) => r.classList.add('selected', 'multi'));
-    this.app.toast?.(`${this.multiSelected.size} Blöcke markiert · Entf löscht · Strg+C kopiert`, { duration: 1800 });
+    const set = new Set(ids.filter((id) => this.index(id) >= 0));
+    if (!keepMode) this.multiMode = false;
+    if (!set.size && !this.multiMode) { this.clearMulti(); return; }
+    this.multiSelected = set;
+    this.blocksEl.querySelectorAll(':scope > .block').forEach((r) => {
+      const on = set.has(r.dataset.id);
+      r.classList.toggle('selected', on);
+      r.classList.toggle('multi', on);
+    });
+    this.showMultiBar();
+  }
+
+  /** Blöcke von a bis b (in Dokument-Reihenfolge) markieren */
+  selectBlockRange(a, b, opts) {
+    let i = this.index(a), j = this.index(b);
+    if (i < 0 || j < 0) return;
+    if (i > j) [i, j] = [j, i];
+    this.multiAnchor = a;
+    this.selectBlocks(this.note.blocks.slice(i, j + 1).map((x) => x.id), opts);
+  }
+
+  toggleInMulti(id) {
+    const set = new Set(this.multiSelected || []);
+    set.has(id) ? set.delete(id) : set.add(id);
+    this.multiAnchor = id;
+    this.selectBlocks([...set], { keepMode: true });
+  }
+
+  /** Auswahl-Modus für Touch: Tippen auf Blöcke fügt sie hinzu/entfernt sie */
+  startMultiMode(id) {
+    this.multiMode = true;
+    this.selectBlocks(id ? [id] : [], { keepMode: true });
+    this.app.toast?.('Tippe weitere Blöcke an, um sie zu markieren', { duration: 2200 });
   }
 
   clearMulti() {
+    this.multiMode = false;
+    this.multiBar?.remove();
+    this.multiBar = null;
     if (!this.multiSelected) return;
     this.multiSelected = null;
     this.blocksEl?.querySelectorAll('.block.multi').forEach((r) => r.classList.remove('selected', 'multi'));
+  }
+
+  /** Leiste über der Auswahl: Anzahl, KI, Kopieren, Löschen */
+  showMultiBar() {
+    const n = this.multiSelected?.size || 0;
+    this.multiBar?.remove();
+    const bar = h('div.multi-bar', {},
+      h('span.multi-count', { text: n === 1 ? '1 Block' : `${n} Blöcke` }),
+      this.app.ai ? h('button.multi-ai', { title: 'Mit KI bearbeiten (Strg+J)', disabled: !n, onclick: (e) => contextMenu(this.app.ai.multiMenuItems(), e.currentTarget) }, icon('sparkles', 15), h('span', { text: 'KI' })) : null,
+      h('button', { title: 'Kopieren (Strg+C)', disabled: !n, onclick: () => this.copyMulti() }, icon('copy', 15)),
+      h('button', { title: 'Löschen (Entf)', disabled: !n, onclick: () => this.deleteMulti() }, icon('trash', 15)),
+      h('span.multi-sep'),
+      h('button', { title: 'Auswahl aufheben (Esc)', onclick: () => this.clearMulti() }, icon('x', 15)));
+    this.multiBar = bar;
+    document.body.append(bar);
+    this.placeMultiBar();
+  }
+
+  placeMultiBar() {
+    const bar = this.multiBar;
+    if (!bar) return;
+    const rows = [...(this.multiSelected || [])].map((id) => this.rowEl(id)).filter(Boolean);
+    const pr = this.page.getBoundingClientRect();
+    const sr = this.root.getBoundingClientRect();
+    const top = rows.length ? Math.min(...rows.map((r) => r.getBoundingClientRect().top)) : sr.top + 60;
+    bar.style.top = Math.max(sr.top + 8, Math.min(top - bar.offsetHeight - 8, sr.bottom - bar.offsetHeight - 8)) + 'px';
+    bar.style.left = Math.max(8, Math.min(pr.left + pr.width / 2 - bar.offsetWidth / 2, innerWidth - bar.offsetWidth - 8)) + 'px';
   }
 
   deleteMulti() {
@@ -541,6 +607,78 @@ export class Editor {
     }
   }
 
+  /**
+   * Mehrere Blöcke markieren:
+   *  - mit gedrückter Maus über Blockgrenzen ziehen
+   *  - Shift+Klick: Bereich vom aktuellen bis zum angeklickten Block
+   *  - Strg+Klick: einzelne Blöcke hinzufügen/entfernen
+   *  - Touch: Block-Menü → „Mehrere markieren“, dann Blöcke antippen
+   */
+  bindBlockSelection() {
+    const rowAt = (target) => {
+      const row = target?.closest?.('.block');
+      return row && row.parentElement === this.blocksEl ? row : null;
+    };
+    const rowAtY = (y) => {
+      const rows = [...this.blocksEl.querySelectorAll(':scope > .block')];
+      return rows.find((r) => { const b = r.getBoundingClientRect(); return y >= b.top && y < b.bottom; })
+        || (rows.length && y < rows[0].getBoundingClientRect().top ? rows[0] : rows.at(-1));
+    };
+    let drag = null;
+
+    document.addEventListener('mousedown', (e) => {
+      if (e.target.closest('.menu, .multi-bar')) return;
+      if (!this.note || !this.root.isConnected || !this.root.contains(e.target)) { if (this.multiSelected || this.multiMode) this.clearMulti(); return; }
+      const row = rowAt(e.target);
+      const focusedId = document.activeElement?.closest?.('.block')?.dataset.id;
+      const anchorId = this.multiSelected?.size ? this.multiAnchor : (focusedId || this.selectedBlockId);
+      if (row && e.button === 0) {
+        const id = row.dataset.id;
+        if (this.multiMode || ((e.ctrlKey || e.metaKey) && !e.target.closest('a') && (this.multiSelected || (focusedId && focusedId !== id)))) {
+          e.preventDefault();
+          if (!this.multiSelected && focusedId && focusedId !== id) { this.selectBlocks([focusedId], { keepMode: true }); }
+          this.toggleInMulti(id);
+          return;
+        }
+        if (e.shiftKey && anchorId && anchorId !== id && this.index(anchorId) >= 0) {
+          e.preventDefault();
+          this.selectBlockRange(anchorId, id);
+          return;
+        }
+      }
+      // Griff eines markierten Blocks: Auswahl behalten (Block-Menü gilt für alle markierten)
+      if (row && this.multiSelected?.has(row.dataset.id) && e.target.closest('.block-gutter')) return;
+      if (this.multiSelected) this.clearMulti();
+      // Ziehen über mehrere Blöcke vorbereiten (nicht in Tabellen, Bildern, Griffen)
+      if (e.button !== 0 || e.target.closest('.block-gutter, .table-block, .float, .note-title, .page-header, .cover, .ai-result, input, textarea, select')) { drag = null; return; }
+      const start = row || rowAtY(e.clientY);
+      drag = start ? { startId: start.dataset.id, x: e.clientX, y: e.clientY, active: false } : null;
+    }, true);
+
+    document.addEventListener('mousemove', (e) => {
+      if (!drag || !(e.buttons & 1)) { drag = null; return; }
+      if (!drag.active && Math.hypot(e.clientX - drag.x, e.clientY - drag.y) < 6) return;
+      const over = rowAtY(e.clientY);
+      if (!over) return;
+      if (!drag.active && over.dataset.id === drag.startId) return; // Textauswahl innerhalb eines Blocks bleibt normal
+      drag.active = true;
+      e.preventDefault();
+      document.body.classList.add('block-selecting');
+      this.selectBlockRange(drag.startId, over.dataset.id);
+      // am Rand automatisch scrollen
+      const r = this.root.getBoundingClientRect();
+      if (e.clientY < r.top + 40) this.root.scrollTop -= 14;
+      else if (e.clientY > r.bottom - 40) this.root.scrollTop += 14;
+    }, true);
+
+    document.addEventListener('mouseup', () => {
+      if (drag?.active) { document.body.classList.remove('block-selecting'); window.getSelection().removeAllRanges(); this.placeMultiBar(); }
+      drag = null;
+    }, true);
+    this.root.addEventListener('scroll', () => this.placeMultiBar(), { passive: true });
+    window.addEventListener('resize', () => this.placeMultiBar());
+  }
+
   // ================= Slash-Menü =================
 
   insertWithSlash(afterId) {
@@ -694,7 +832,7 @@ export class Editor {
         if (e.key === 'Escape' && first) this.focusBlock(first, 'start');
       }
     }, true);
-    document.addEventListener('mousedown', (e) => { if (this.multiSelected && !e.target.closest('.menu')) this.clearMulti(); }, true);
+    this.bindBlockSelection();
 
     document.addEventListener('keydown', (e) => {
       if (!this.root.isConnected) return;
@@ -983,10 +1121,11 @@ export class Editor {
   openBlockMenu(id, anchor) {
     const b = this.block(id);
     if (!b) return;
-    this.selectBlock(id);
+    const inMulti = this.multiSelected?.has(id) && this.multiSelected.size > 1;
+    if (!inMulti) this.selectBlock(id);
     const textTypes = [...this.registry.blocks.values()].filter((d) => d.text && d.slash !== false);
     contextMenu([
-      { header: this.def(b.type)?.name || b.type },
+      { header: inMulti ? `${this.multiSelected.size} Blöcke markiert` : this.def(b.type)?.name || b.type },
       { label: 'Umwandeln in', icon: 'refresh', submenu: textTypes.map((d) => ({ label: d.name, icon: d.icon, active: d.type === b.type, run: () => this.convertBlock(id, d.type) })) },
       { label: 'Farbe', icon: 'palette', submenu: [
         { header: 'Textfarbe' },
@@ -996,6 +1135,7 @@ export class Editor {
       ] },
       '-',
       ...(this.app.ai ? [{ label: 'KI', icon: 'sparkles', submenu: this.app.ai.blockMenuItems(id) }] : []),
+      { label: 'Mehrere markieren', icon: 'checkSquare', run: () => this.startMultiMode(id) },
       { label: 'Duplizieren', icon: 'copy', shortcut: 'Ctrl+D', run: () => this.duplicateBlock(id) },
       { label: 'Nach oben', icon: 'chevronUp', run: () => { const i = this.index(id); if (i > 0) this.moveBlock(id, i - 1); } },
       { label: 'Nach unten', icon: 'chevronDown', run: () => { const i = this.index(id); if (i < this.note.blocks.length - 1) this.moveBlock(id, i + 2); } },
