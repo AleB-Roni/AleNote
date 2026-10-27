@@ -1,4 +1,8 @@
-# AleNote
+<p align="center">
+  <img src="docs/logo.svg" width="112" height="112" alt="AleNote-Logo">
+</p>
+
+<h1 align="center">AleNote</h1>
 
 Moderne, erweiterbare Notiz-App für Windows, Android und den Browser (z.B. auf dem Mac) im Stil von Obsidian und Notion.
 Basiert auf Electron und reinem JavaScript, ohne Build-Schritt. Jede Datei kann direkt bearbeitet werden.
