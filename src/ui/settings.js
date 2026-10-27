@@ -5,6 +5,7 @@ import { quickSettings } from '../core/todos.js';
 import { remindSettings } from '../core/reminders.js';
 import { icon } from './icons.js';
 import { modal, toast, confirmDialog } from './overlays.js';
+import { isNarrow } from '../core/mobile.js';
 import { eventToShortcut, shortcutHtml } from '../core/shortcuts.js';
 
 export const ACCENTS = ['#7c5cff', '#3b82f6', '#06b6d4', '#10b981', '#84cc16', '#f59e0b', '#f97316', '#ef4444', '#ec4899', '#a855f7'];
@@ -15,7 +16,7 @@ export const FONTS = {
   mono: { name: 'Mono (Cascadia)', css: '"Cascadia Code", "Consolas", ui-monospace, monospace' }
 };
 
-export function openSettings(app, tab = 'appearance') {
+export function openSettings(app, tab) {
   const tabs = [
     ['appearance', 'Darstellung', 'palette'],
     ['editor', 'Editor', 'edit'],
@@ -32,23 +33,32 @@ export function openSettings(app, tab = 'appearance') {
   const mobile = !!app.api.isMobile;
   const shown = tabs.filter(([id]) => !(mobile && id === 'hotkeys'));
   if (mobile && tab === 'hotkeys') tab = 'appearance';
+  // Schmaler Bildschirm: erst Liste der Bereiche, dann die Seite mit „Zurück“ (wie in Android)
+  const drill = isNarrow();
   const nav = h('div.settings-nav');
   const body = h('div.settings-body');
-  const content = h('div.settings', {}, nav, body);
+  const content = h('div.settings' + (drill ? '.drill' : ''), {}, nav, body);
   const m = modal({ title: 'Einstellungen', content, width: 'min(900px, 94vw)', className: 'settings-modal' });
 
+  const showList = () => { content.classList.remove('page-open'); nav.scrollTop = 0; };
   const show = (id) => {
     nav.querySelectorAll('.settings-tab').forEach((b) => b.classList.toggle('active', b.dataset.tab === id));
     body.innerHTML = '';
     const page = h('div.settings-page');
+    if (drill) {
+      const label = shown.find(([t]) => t === id)?.[1] || '';
+      body.append(h('button.settings-back', { onclick: showList }, icon('chevronRight', 16, 'flip'), h('span', { text: 'Einstellungen' }), h('b', { text: label })));
+      content.classList.add('page-open');
+    }
     ({ appearance, editor, hotkeys, quick, reminders, ai, account, plugins, vault, about })[id](app, page, () => show(id), m);
     body.append(page);
     body.scrollTop = 0;
   };
   for (const [id, label, ic] of shown) {
-    nav.append(h('button.settings-tab', { dataset: { tab: id }, onclick: () => show(id) }, icon(ic, 16), h('span', { text: label })));
+    nav.append(h('button.settings-tab', { dataset: { tab: id }, onclick: () => show(id) }, icon(ic, 16), h('span', { text: label }), drill ? icon('chevronRight', 15, 'settings-arrow') : null));
   }
-  show(tab);
+  if (drill && !tab) showList();
+  else show(tab || 'appearance');
   return m;
 }
 

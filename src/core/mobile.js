@@ -49,6 +49,10 @@ export function initMobile(app) {
   api.plugins.App.addListener('backButton', () => {
     const esc = () => document.activeElement?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })) || document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     if (document.querySelector('.menu')) { closeMenu(); document.querySelector('.slash-menu') && esc(); return; }
+    // Einstellungen: von einer Seite zurück zur Liste der Bereiche
+    const top = [...document.querySelectorAll('.modal-backdrop')].pop();
+    const back = top?.querySelector('.settings.drill.page-open .settings-back');
+    if (back) { back.click(); return; }
     if (document.querySelector('.modal-backdrop, .palette-backdrop, .lightbox')) {
       const lb = document.querySelector('.lightbox');
       if (lb) { lb.click(); return; }
