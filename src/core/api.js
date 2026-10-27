@@ -33,7 +33,8 @@ function createBrowserFallback() {
     chooseVault: () => ok(null),
     revealInExplorer: () => ok(),
     openFolder: () => ok(),
-    tree: () => ok(tree('')),
+    tree: (opts) => ok(opts?.trash ? tree('_trash') : tree('').filter((n) => n.path !== '_trash')),
+    ensureFolder: (p) => { const parts = (p || '').split('/').filter(Boolean); parts.forEach((_, i) => { const f = parts.slice(0, i + 1).join('/'); if (!db.folders.includes(f)) db.folders.push(f); }); save(); return ok(p); },
     readNote: (p) => ok(structuredClone(db.files[p])),
     writeNote: (p, d) => { db.files[p] = structuredClone(d); save(); return ok(true); },
     createNote: (dir, name, data) => { const p = unique(dir || '', clean(name), EXT); db.files[p] = data || {}; save(); return ok(p); },
@@ -50,7 +51,7 @@ function createBrowserFallback() {
     duplicate: (p) => { const t = unique(dirOf(p), baseOf(p).slice(0, -EXT.length) + ' Kopie', EXT); db.files[t] = structuredClone(db.files[p]); save(); return ok(t); },
     search: (q) => {
       q = q.toLowerCase();
-      return ok(Object.entries(db.files).filter(([k, v]) => k.toLowerCase().includes(q) || JSON.stringify(v).toLowerCase().includes(q))
+      return ok(Object.entries(db.files).filter(([k]) => !k.startsWith('_trash/')).filter(([k, v]) => k.toLowerCase().includes(q) || JSON.stringify(v).toLowerCase().includes(q))
         .map(([k, v]) => ({ type: 'note', path: k, name: baseOf(k).slice(0, -EXT.length), icon: v.icon, snippet: '' })));
     },
     saveAsset: (name, bytes) => {

@@ -4,6 +4,7 @@ import { icon } from './icons.js';
 import { contextMenu, confirmDialog, toast } from './overlays.js';
 import { todoBadge } from './calendar.js';
 import { shortcutText } from '../core/shortcuts.js';
+import { listTrash } from '../core/trash.js';
 
 export class Sidebar {
   constructor(app, el) {
@@ -69,6 +70,7 @@ export class Sidebar {
       h('button.icon-btn', { title: 'Eigene Hotkeys', onclick: () => app.openSettings('hotkeys') }, icon('keyboard', 17)),
       h('button.icon-btn', { title: 'Plugins', onclick: () => app.openSettings('plugins') }, icon('puzzle', 17)),
       h('button.icon-btn', { title: 'Hell/Dunkel wechseln', onclick: () => app.toggleTheme() }, icon('moon', 17)),
+      this.trashBtn = h('button.icon-btn.trash-btn', { title: 'Papierkorb', onclick: () => app.openTrash() }, icon('trash', 17), h('span.trash-count')),
       h('div.flex'),
       h('button.vault-btn', { title: 'Vault wechseln', onclick: () => app.chooseVault() }, icon('vault', 15), h('span.vault-name', { text: '' })));
     this.vaultName = footer.querySelector('.vault-name');
@@ -115,6 +117,7 @@ export class Sidebar {
     this.renderPanels();
     this.app.events.emit('tree:change', this.tree);
     this.updateBadge();
+    this.updateTrashBadge();
     return this.tree;
   }
 
@@ -130,6 +133,14 @@ export class Sidebar {
         this.calBadge.title = `${today} heute fällig · ${overdue} überfällig`;
       } catch (err) { console.error(err); }
     }, 400);
+  }
+
+  /** Anzahl der Einträge im Papierkorb am Knopf unten */
+  async updateTrashBadge(n) {
+    if (n === undefined) { try { n = (await listTrash(this.app.api)).filter((x) => !x.empty).length; } catch { n = 0; } }
+    const el = this.trashBtn?.querySelector('.trash-count');
+    if (el) el.textContent = n ? String(n) : '';
+    if (this.trashBtn) this.trashBtn.title = n ? `Papierkorb (${n})` : 'Papierkorb';
   }
 
   allNotes() {
@@ -326,7 +337,7 @@ export class Sidebar {
   }
 
   async confirmDelete(name, isFolder) {
-    return confirmDialog(isFolder ? 'Ordner löschen?' : 'Notiz löschen?', `"${name}"${isFolder ? ' und alle Inhalte werden' : ' wird'} in den Papierkorb verschoben.`);
+    return confirmDialog(isFolder ? 'Ordner löschen?' : 'Notiz löschen?', `„${name}“${isFolder ? ' und alle Inhalte werden' : ' wird'} in den Papierkorb verschoben und kann dort 30 Tage lang wiederhergestellt werden.`, { okLabel: 'In den Papierkorb' });
   }
 }
 

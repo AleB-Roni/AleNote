@@ -15,6 +15,7 @@ contextBridge.exposeInMainWorld('alenoteNative', {
   writeNote: call('note:write'),
   createNote: call('note:create'),
   createFolder: call('folder:create'),
+  ensureFolder: call('folder:ensure'),
   rename: call('item:rename'),
   move: call('item:move'),
   remove: call('item:delete'),

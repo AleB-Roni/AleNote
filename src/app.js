@@ -23,6 +23,8 @@ import { CalendarView } from './ui/calendar.js';
 import { openQuickNote } from './ui/quicknote.js';
 import { datePicker } from './ui/datepicker.js';
 import { addQuickNote, dueLabel } from './core/todos.js';
+import { moveToTrash, listTrash, restoreFromTrash, purgeExpired } from './core/trash.js';
+import { openTrash } from './ui/trash.js';
 import { initMobile, isNarrow } from './core/mobile.js';
 
 class App {
@@ -99,6 +101,8 @@ class App {
     this.events.on('todos:change', () => this.sidebar.updateBadge());
     this.events.on('note:save', (data) => { if ((data.blocks || []).some((b) => b.type === 'todo' && b.data?.due)) this.sidebar.updateBadge(); });
     document.body.classList.add('ready');
+    // Papierkorb: Einträge älter als 30 Tage entfernen
+    setTimeout(() => purgeExpired(api).then((n) => { if (n) this.sidebar.updateTrashBadge?.(); }).catch((err) => console.error(err)), 4000);
     if (this.startErrors.length) toast('Beim Start ist ein Fehler aufgetreten – ' + this.startErrors.join(' · '), { type: 'error', duration: 12000 });
     this.events.emit('app:ready', this);
   }
@@ -388,13 +392,27 @@ class App {
   async deleteItem(path, name, isFolder = false) {
     if (!(await this.sidebar.confirmDelete(name, isFolder))) return;
     const affectsCurrent = this.currentPath && (this.currentPath === path || this.currentPath.startsWith(path + '/'));
+    await this.saveNow(); // letzte Änderungen mit in den Papierkorb nehmen
     if (affectsCurrent) { this.scheduleSave.cancel(); this.editor.note = null; }
-    await api.remove(path);
+    let trashed;
+    try { trashed = await moveToTrash(api, path); }
+    catch (err) { toast('Löschen fehlgeschlagen: ' + err.message, { type: 'error' }); if (affectsCurrent) this.showEmpty(); return; }
     this.saveSettings({ favorites: (this.settings.favorites || []).filter((p) => p !== path && !p.startsWith(path + '/')) });
     await this.sidebar.refresh();
     if (affectsCurrent) this.showEmpty();
-    toast(`"${name}" gelöscht`, { type: 'success' });
+    toast(`„${name}“ ist im Papierkorb`, {
+      type: 'success', duration: 6000,
+      action: { label: 'Rückgängig', run: async () => {
+        const item = (await listTrash(api)).find((x) => x.path === trashed);
+        if (!item) return;
+        const p = await restoreFromTrash(api, item);
+        await this.sidebar.refresh();
+        if (!isFolder) this.openNote(p);
+      } }
+    });
   }
+
+  openTrash() { openTrash(this); }
 
   toggleFavorite(path) {
     const favs = new Set(this.settings.favorites || []);
@@ -526,6 +544,7 @@ class App {
     r.registerCommand({ id: 'core.quickNote', name: 'Schnellnotiz', icon: 'zap', shortcut: 'Ctrl+Shift+Space', group: 'Notizen', run: () => this.quickNote() });
     r.registerCommand({ id: 'core.calendar', name: 'Kalender öffnen', icon: 'calendar', shortcut: 'Ctrl+Alt+K', group: 'Navigation', run: () => this.openCalendar() });
     r.registerCommand({ id: 'core.todoDue', name: 'Fälligkeitsdatum festlegen', icon: 'calendar', shortcut: 'Ctrl+Shift+T', group: 'Bearbeiten', when: hasNote, run: () => this.setDueForFocused() });
+    r.registerCommand({ id: 'core.trash', name: 'Papierkorb öffnen', icon: 'trash', group: 'Notizen', run: () => this.openTrash() });
     r.registerCommand({ id: 'core.vault', name: 'Vault wechseln', icon: 'vault', group: 'Allgemein', run: () => this.chooseVault() });
     for (let i = 1; i <= 3; i++) {
       r.registerCommand({ id: 'core.h' + i, name: `In Überschrift ${i} umwandeln`, icon: 'h' + i, shortcut: `Ctrl+Alt+${i}`, group: 'Formatieren', when: hasNote, run: () => this.convertFocused('h' + i) });

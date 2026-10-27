@@ -119,7 +119,7 @@ export async function createMobileApi({ web = false } = {}) {
   async function readTree(dir) {
     const out = [];
     for (const e of await vault.list(dir)) {
-      if (e.name.startsWith('.') || e.name === '_assets' || e.name.endsWith('.tmp')) continue;
+      if (e.name.startsWith('.') || e.name === '_assets' || e.name.endsWith('.tmp') || (!dir && e.name === '_trash')) continue;
       const p = join(dir, e.name);
       if (e.type === 'directory') out.push({ type: 'folder', name: e.name, path: p, children: await readTree(p) });
       else if (e.name.endsWith(NOTE_EXT)) {
@@ -260,7 +260,8 @@ export async function createMobileApi({ web = false } = {}) {
     revealInExplorer: async () => {},
     openFolder: async () => {},
 
-    tree: () => readTree(''),
+    tree: async (opts) => (opts?.trash ? ((await vault.exists('_trash')) ? readTree('_trash') : []) : readTree('')),
+    ensureFolder: async (p) => { await vault.mkdir(p || ''); return p; },
     readNote: async (p) => JSON.parse(await vault.readText(p)),
     writeNote: async (p, data) => { await vault.writeText(p, JSON.stringify(data, null, 2)); touched(); return true; },
     createNote: async (dir, name, data) => {

@@ -267,7 +267,11 @@ class SyncManager {
       state.items[p] = { kind: 'note', rev: res.rev, hash: res.hash };
       this.conflicts.delete(p);
     } catch (err) {
-      if (err.status === 409) return this.addConflict(p, err.body?.current);
+      // Neue Notiz an einer Stelle, die auf dem Server als gelöscht gilt (z.B. aus dem Papierkorb
+      // wiederhergestellt): kein echter Konflikt → mit der Version des Löschvermerks erneut senden
+      const cur = err.body?.current;
+      if (err.status === 409 && !force && !baseRev && cur?.deleted && cur.rev) return this.upload(p, cur.rev, state);
+      if (err.status === 409) return this.addConflict(p, cur);
       throw err;
     }
   }

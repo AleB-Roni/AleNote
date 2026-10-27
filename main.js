@@ -12,6 +12,7 @@ const { Updater } = require('./updater');
 const NOTE_EXT = '.alenote';
 const ASSET_DIR = '_assets';
 const CONFIG_DIR = '.alenote';
+const TRASH_DIR = '_trash'; // Papierkorb (siehe src/core/trash.js)
 
 protocol.registerSchemesAsPrivileged([
   { scheme: 'alenote', privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true, stream: true } }
@@ -67,7 +68,7 @@ async function readTree(dir) {
   const entries = await fs.readdir(dir, { withFileTypes: true });
   const out = [];
   for (const e of entries) {
-    if (e.name.startsWith('.') || e.name === ASSET_DIR) continue;
+    if (e.name.startsWith('.') || e.name === ASSET_DIR || (dir === vault && e.name === TRASH_DIR)) continue;
     const abs = path.join(dir, e.name);
     if (e.isDirectory()) {
       out.push({ type: 'folder', name: e.name, path: toRel(abs), children: await readTree(abs) });
@@ -323,7 +324,12 @@ function registerIpc() {
   handle('vault:reveal', (rel) => shell.showItemInFolder(resolveInVault(rel || '')));
   handle('vault:openFolder', (rel) => shell.openPath(resolveInVault(rel || '')));
 
-  handle('tree', () => readTree(vault));
+  handle('tree', async (opts) => {
+    if (!opts?.trash) return readTree(vault);
+    const dir = path.join(vault, TRASH_DIR);
+    return (await exists(dir)) ? readTree(dir) : [];
+  });
+  handle('folder:ensure', async (rel) => { await fs.mkdir(resolveInVault(rel || ''), { recursive: true }); return rel; });
 
   handle('note:read', async (rel) => JSON.parse(await fs.readFile(resolveInVault(rel), 'utf8')));
   handle('note:write', async (rel, data) => {

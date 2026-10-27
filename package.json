@@ -1,7 +1,7 @@
 {
   "name": "alenote",
   "productName": "AleNote",
-  "version": "1.6.0",
+  "version": "1.7.0",
   "description": "AleNote – moderne, erweiterbare Notiz-App im Stil von Obsidian/Notion",
   "main": "main.js",
   "author": "AleNote",

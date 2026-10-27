@@ -1151,3 +1151,34 @@ body.is-web .ai-panel-head { padding-right: 14px; }
 .tab-lock h2 { margin: 0 0 8px; }
 .tab-lock p { color: var(--text-2); margin: 0 0 18px; }
 .login-local { display: block; margin: 12px auto 0; color: var(--text-3); font-size: 12.5px; }
+
+/* Toast mit Knopf (z.B. Rückgängig) */
+.toast-host { pointer-events: none; }
+.toast:has(.toast-action) { pointer-events: auto; }
+.toast-action { margin-left: 6px; padding: 4px 10px; border-radius: 7px; font-weight: 600; color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.toast-action:hover { background: color-mix(in srgb, var(--accent) 22%, transparent); }
+
+/* Papierkorb */
+.trash-btn { position: relative; }
+.trash-count:empty { display: none; }
+.trash-count { position: absolute; top: 1px; right: 0; min-width: 15px; height: 15px; padding: 0 4px; border-radius: 8px; font-size: 9.5px; font-weight: 700; line-height: 15px; color: #fff; background: var(--text-3); }
+.trash-modal .modal-body { padding-top: 6px; }
+.trash-head { display: flex; gap: 10px; align-items: center; margin-bottom: 10px; }
+.trash-filter { flex: 1; }
+.trash-list { display: flex; flex-direction: column; gap: 4px; max-height: min(60vh, 520px); overflow: auto; margin: 0 -6px; padding: 0 6px; }
+.trash-item { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--border); background: var(--bg-2); animation: fadeSlide .2s; }
+.trash-icon { width: 26px; display: grid; place-items: center; color: var(--text-2); font-size: 18px; flex: none; }
+.trash-info { flex: 1; min-width: 0; }
+.trash-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.trash-meta { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 2px; }
+.trash-left { font-size: 11.5px; color: var(--text-3); white-space: nowrap; flex: none; }
+.trash-left.soon { color: var(--c-orange); }
+.icon-btn.danger-hover:hover { color: var(--c-red); background: color-mix(in srgb, var(--c-red) 12%, transparent); }
+.trash-empty { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 36px 12px; text-align: center; }
+.trash-empty-icon { width: 60px; height: 60px; border-radius: 18px; display: grid; place-items: center; color: var(--text-3); background: var(--bg-2); margin-bottom: 6px; }
+.trash-hint { margin: 12px 0 0; }
+@media (max-width: 760px) {
+  .trash-item { flex-wrap: wrap; }
+  .trash-info { flex-basis: calc(100% - 40px); }
+  .trash-left { margin-left: 38px; flex: 1; }
+}

@@ -74,7 +74,9 @@ class Vault {
       const curRev = cur ? cur.rev : 0;
       const hash = hashOf(buf);
       if (cur && !cur.deleted && cur.hash === hash && cur.kind === kind) return { path: p, ...cur, unchanged: true };
-      if (!force && kind !== 'asset' && baseRev !== curRev) {
+      // Eine gelöschte Notiz neu anzulegen (baseRev 0, z.B. aus dem Papierkorb) ist kein Konflikt
+      const recreate = cur?.deleted && baseRev === 0;
+      if (!force && kind !== 'asset' && baseRev !== curRev && !recreate) {
         const e = httpError(409, 'Konflikt: Auf dem Server gibt es eine neuere Version');
         e.extra = { current: cur ? { path: p, ...cur } : null };
         throw e;

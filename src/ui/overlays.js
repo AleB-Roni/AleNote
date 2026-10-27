@@ -5,12 +5,15 @@ import { shortcutHtml } from '../core/shortcuts.js';
 
 // ---------- Toast ----------
 let toastHost;
-export function toast(message, { type = 'info', duration = 2600 } = {}) {
+export function toast(message, { type = 'info', duration = 2600, action } = {}) {
   if (!toastHost) toastHost = document.body.appendChild(h('div.toast-host'));
   const ico = { info: 'zap', success: 'check', error: 'x' }[type] || 'zap';
   const el = h('div.toast.toast-' + type, {}, icon(ico, 15), h('span', { text: message }));
+  const hide = () => { el.classList.add('leaving'); setTimeout(() => el.remove(), 300); };
+  // Optionaler Knopf, z.B. „Rückgängig“
+  if (action) el.append(h('button.toast-action', { text: action.label, onclick: () => { hide(); action.run(); } }));
   toastHost.append(el);
-  setTimeout(() => { el.classList.add('leaving'); setTimeout(() => el.remove(), 300); }, duration);
+  setTimeout(hide, duration);
 }
 
 // ---------- Modal ----------

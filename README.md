@@ -101,6 +101,7 @@ Die portable EXE kann sich nicht selbst aktualisieren.
 - **Schnellnotiz** (⚡ in der Seitenleiste, Strg+Shift+Space in AleNote, **Strg+Alt+Space überall in Windows**): kleines Fenster, Text eintippen, Enter. Der Eintrag landet mit Datum und Uhrzeit in „Quicknotizen“ oder einer frei wählbaren Notiz, auf Wunsch als To-do mit Fälligkeitsdatum. Einstellungen → Schnellnotiz.
 - **Fälligkeitsdatum für To-dos**: im To-do auf 📅 klicken, `/To-do mit Datum` oder Strg+Shift+T. Heute, Morgen oder Überfällig werden farbig markiert.
 - **Kalender** (Seitenleiste oder Strg+Alt+K): Monats- und Listenansicht mit allen To-dos des angemeldeten Benutzers. Abhaken, per Ziehen auf einen anderen Tag verschieben, Doppelklick auf einen Tag legt eine Aufgabe an, Klick öffnet die Notiz.
+- **Papierkorb** (🗑 unten in der Seitenleiste oder Befehl „Papierkorb öffnen“): Gelöschte Notizen und Ordner bleiben 30 Tage erhalten und lassen sich an ihren alten Platz zurücklegen. Direkt nach dem Löschen geht auch „Rückgängig“. Der Papierkorb wird mitsynchronisiert, Wiederherstellen klappt also auch auf einem anderen Gerät. Er liegt im Vault im Ordner `_trash`.
 - **Mitgelieferte Plugins**: Wortzähler, Markdown-Export, Tagesnotiz (Strg+Alt+N), Gliederung, Fortschrittsbalken
 
 ## Eigene Hotkeys
