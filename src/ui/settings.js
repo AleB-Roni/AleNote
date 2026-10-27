@@ -291,12 +291,13 @@ function reminders(app, page, rerender) {
   const rs = remindSettings(app);
   const set = (patch) => app.saveSettings({ reminders: { ...(app.settings.reminders || {}), ...patch } });
   const api = app.api;
-  page.append(section('Erinnerungen', 'AleNote erinnert dich an To-dos mit Fälligkeitsdatum. Ohne Uhrzeit wird zur Standardzeit am Fälligkeitstag erinnert.'));
+  page.append(section('Erinnerungen', 'Tippe im To-do auf die Glocke 🔔, um eine Erinnerung zu aktivieren – z.B. 1 Stunde, 3 Stunden oder 1 Tag vorher (auch mehrere). Ohne Uhrzeit gilt die Standardzeit am Fälligkeitstag.'));
   page.append(row('Erinnerungen aktiv', null, toggle(rs.enabled, (v) => set({ enabled: v }))));
   const time = h('input.input', { type: 'time', value: rs.defaultTime, style: { width: '120px' } });
   time.addEventListener('change', () => set({ defaultTime: time.value || '09:00' }));
   page.append(row('Standardzeit', 'Für To-dos mit Datum, aber ohne Uhrzeit', time));
-  page.append(row('Wann erinnern?', null, select([['0', 'Zur Fälligkeit'], ['5', '5 Minuten vorher'], ['15', '15 Minuten vorher'], ['30', '30 Minuten vorher'], ['60', '1 Stunde vorher'], ['1440', '1 Tag vorher']], String(rs.before), (v) => set({ before: Number(v) }))));
+  page.append(row('Alle To-dos mit Datum erinnern', 'Auch ohne Glocke an jedes To-do mit Fälligkeitsdatum erinnern', toggle(rs.auto, (v) => { set({ auto: v }); rerender(); })));
+  if (rs.auto) page.append(row('Wann erinnern?', 'Für To-dos ohne eigene Glocken-Einstellung', select([['0', 'Zur Fälligkeit'], ['5', '5 Minuten vorher'], ['15', '15 Minuten vorher'], ['30', '30 Minuten vorher'], ['60', '1 Stunde vorher'], ['180', '3 Stunden vorher'], ['1440', '1 Tag vorher']], String(rs.before), (v) => set({ before: Number(v) }))));
   page.append(row('Tagesübersicht', 'Beim ersten Öffnen am Tag: was heute fällig oder überfällig ist', toggle(rs.daily, (v) => set({ daily: v }))));
 
   if (api.isMobile) {

@@ -1,5 +1,6 @@
 // Anpassungen für Handys: Seitenleiste als Schublade, Wischgeste, Zurück-Taste, Statusleiste
 import { closeMenu } from '../ui/overlays.js';
+import { updateTodo } from './todos.js';
 
 export const isNarrow = () => matchMedia('(max-width: 760px)').matches;
 
@@ -71,15 +72,41 @@ export function initMobile(app) {
   const runAction = (action) => {
     if (!action) return;
     if (action === 'calendar') { setDrawer(false); app.openCalendar(); return; }
+    // To-do-Widget: Überschrift → Aufgabenliste im Kalender, ＋ → neues To-do
+    if (action === 'todos') {
+      setDrawer(false);
+      app.openCalendar().then(() => { if (app.calendar) { app.calendar.mode = 'list'; app.calendar.render(); } });
+      return;
+    }
+    if (action === 'newtodo') { app.quickNote({ asTodo: true }); return; }
     app.quickNote();
     if (action === 'dictate') setTimeout(() => document.querySelector('.qn-modal .qn-mic')?.click(), 350);
   };
   const pollAction = () => tools.getLaunchAction().then((r) => runAction(r?.action)).catch(() => {});
+  // Im To-do-Widget abgehakte Aufgaben in die Notizen übernehmen
+  let applying = null, again = false;
+  const applyWidgetToggles = () => {
+    if (applying) { again = true; return applying; }
+    return (applying = (async () => {
+      try {
+        const r = await tools.takeWidgetToggles();
+        const list = JSON.parse(r?.items || '[]');
+        for (const t of list) await updateTodo(app, t.path, t.id, { checked: !!t.checked }).catch((err) => console.warn('Widget-To-do', err.message));
+        if (list.length) app.events.emit('todos:change');
+      } catch (err) { console.warn('Widget-To-dos', err); }
+    })().finally(() => { applying = null; if (again) { again = false; applyWidgetToggles(); } }));
+  };
   app.events.on('app:ready', () => {
     tools.addListener('launchAction', (e) => runAction(e?.action))?.catch?.(() => {});
+    tools.addListener('widgetToggle', () => applyWidgetToggles())?.catch?.(() => {});
     pollAction();
+    applyWidgetToggles();
   });
-  api.plugins.App.addListener('resume', () => { if (document.body.classList.contains('ready')) setTimeout(pollAction, 150); });
+  api.plugins.App.addListener('resume', () => {
+    if (!document.body.classList.contains('ready')) return;
+    setTimeout(pollAction, 150);
+    applyWidgetToggles();
+  });
 
   // Beim Wechsel in den Hintergrund sofort speichern
   api.plugins.App.addListener('pause', () => app.saveNow());

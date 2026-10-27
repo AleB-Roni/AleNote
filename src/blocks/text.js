@@ -6,6 +6,8 @@ import { BLOCK_COLORS } from '../ui/editor.js';
 import { icon } from '../ui/icons.js';
 import { datePicker } from '../ui/datepicker.js';
 import { dueLabel, dueState } from '../core/todos.js';
+import { offsetLabel, remindSettings } from '../core/reminders.js';
+import { remindPicker } from '../ui/remindpicker.js';
 
 /** Erstellt das Haupt-Textfeld eines Blocks */
 export function editable(block, { tag = 'div', field = 'text', placeholder = '', cls = '' } = {}) {
@@ -93,6 +95,30 @@ export default function registerTextBlocks(registry) {
         } })
       }, icon('calendar', 13), b.data.due ? h('span', { text: dueLabel(b.data.due, b.data.dueTime) }) : null);
       row.append(due);
+      // Erinnerung (Glocke): mehrere Zeitpunkte vor der Fälligkeit
+      const remind = Array.isArray(b.data.remind) ? b.data.remind : [];
+      const bellOn = remind.length > 0 && !!b.data.due;
+      const bell = h('button.todo-bell' + (bellOn ? '.on' : '') + (b.data.due ? '.dated' : ''), {
+        title: bellOn ? 'Erinnerung: ' + remind.map((m) => offsetLabel(m)).join(', ') : 'Erinnerung aktivieren',
+        contenteditable: 'false',
+        onmousedown: (e) => e.preventDefault(),
+        onclick: () => remindPicker(bell, {
+          due: b.data.due, time: b.data.dueTime, remind, rs: remindSettings(ctx.app),
+          onPickDate: () => due.click(),
+          onChange: (list) => {
+            if (list.length) b.data.remind = list; else delete b.data.remind;
+            const on = list.length > 0;
+            bell.classList.toggle('on', on);
+            bell.title = on ? 'Erinnerung: ' + list.map((m) => offsetLabel(m)).join(', ') : 'Erinnerung aktivieren';
+            bellLabel.textContent = on ? (list.length > 1 ? list.length + '×' : offsetLabel(list[0], true)) : '';
+            ctx.editor.changed(true);
+            ctx.app.events.emit('todos:change');
+          }
+        })
+      }, icon('bell', 13));
+      const bellLabel = h('span', { text: bellOn ? (remind.length > 1 ? remind.length + '×' : offsetLabel(remind[0], true)) : '' });
+      bell.append(bellLabel);
+      row.append(bell);
       box.addEventListener('click', () => {
         const checked = !b.data.checked;
         ctx.update({ checked });

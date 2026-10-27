@@ -52,6 +52,21 @@
             <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_quick_info" />
         </receiver>
 
+        <!-- To-do-Widget: offene Aufgaben lesen und abhaken -->
+        <receiver
+            android:name=".TodoWidget"
+            android:exported="true"
+            android:label="@string/todos_title">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_todos_info" />
+        </receiver>
+        <service
+            android:name=".TodoWidgetService"
+            android:exported="false"
+            android:permission="android.permission.BIND_REMOTEVIEWS" />
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
@@ -81,6 +96,8 @@
     <!-- Erinnerungen an fällige Aufgaben (pünktlich, auch wenn die App geschlossen ist) -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <!-- Android 13+: pünktliche Erinnerungen ohne extra Freigabe -->
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <!-- Diktieren (Mikrofon) -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />

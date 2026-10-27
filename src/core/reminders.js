@@ -5,18 +5,44 @@
 // To-dos ohne Uhrzeit erinnern zur eingestellten Standardzeit (z.B. 9:00 Uhr) am Fälligkeitstag.
 import { h, debounce } from './utils.js';
 import { icon } from '../ui/icons.js';
-import { collectTodos, updateTodo, parseDay, todayKey, dueLabel } from './todos.js';
+import { collectTodos, updateTodo, parseDay, todayKey, dueLabel, dueState } from './todos.js';
 
-export const REMIND_DEFAULTS = { enabled: true, defaultTime: '09:00', before: 0, daily: true };
+// auto: alle To-dos mit Datum erinnern (sonst nur die mit Glocke 🔔)
+export const REMIND_DEFAULTS = { enabled: true, auto: false, defaultTime: '09:00', before: 0, daily: true };
 export const remindSettings = (app) => ({ ...REMIND_DEFAULTS, ...(app.settings.reminders || {}) });
 
-/** Zeitpunkt der Erinnerung (ms) oder null */
-export function reminderTime(todo, rs) {
-  if (!todo.due || todo.checked) return null;
+/** Auswahl für die Glocke am To-do (Minuten vor der Fälligkeit) */
+export const REMIND_OPTIONS = [0, 15, 60, 180, 1440, 2880, 10080];
+
+/** 0 → „Zur Fälligkeit“, 180 → „3 Stunden vorher“ (short: „3 Std.“) */
+export function offsetLabel(min, short = false) {
+  min = Number(min) || 0;
+  if (!min) return short ? 'Fällig' : 'Zur Fälligkeit';
+  const units = [[10080, 'Woche', 'Wochen', 'Wo.'], [1440, 'Tag', 'Tage', 'T.'], [60, 'Stunde', 'Stunden', 'Std.'], [1, 'Minute', 'Minuten', 'Min.']];
+  const [f, one, many, abbr] = units.find(([f]) => min % f === 0);
+  const n = min / f;
+  return short ? `${n} ${abbr}` : `${n} ${n === 1 ? one : many} vorher`;
+}
+
+/** Fälligkeitszeitpunkt (ms); ohne Uhrzeit gilt die Standardzeit */
+export function dueTime(todo, rs) {
   const [hh, mm] = String(todo.time || rs.defaultTime || '09:00').split(':').map(Number);
   const d = parseDay(todo.due);
   d.setHours(hh || 0, mm || 0, 0, 0);
-  return d.getTime() - (Number(rs.before) || 0) * 6e4;
+  return d.getTime();
+}
+
+/** Minuten-Abstände, zu denen an dieses To-do erinnert wird */
+export function reminderOffsets(todo, rs) {
+  if (!todo.due || todo.checked) return [];
+  if (todo.remind?.length) return [...new Set(todo.remind.map(Number))];
+  return rs.auto ? [Number(rs.before) || 0] : [];
+}
+
+/** Zeitpunkt der Erinnerung (ms) oder null */
+export function reminderTime(todo, rs, offset = rs.before) {
+  if (!todo.due || todo.checked) return null;
+  return dueTime(todo, rs) - (Number(offset) || 0) * 6e4;
 }
 
 const store = {
@@ -64,18 +90,28 @@ export class ReminderService {
 
   upcoming() {
     const rs = this.settings;
-    return this.todos.map((t) => {
-      const key = `${t.path}#${t.id}@${t.due}${t.time || ''}`;
-      return { ...t, key, at: this.snoozed[key] || reminderTime(t, rs) };
-    }).filter((t) => t.at);
+    return this.todos.flatMap((t) => reminderOffsets(t, rs).map((off) => {
+      const key = `${t.path}#${t.id}@${t.due}${t.time || ''}` + (off ? '-' + off : '');
+      return { ...t, key, offset: off, at: this.snoozed[key] || reminderTime(t, rs, off) };
+    })).filter((t) => t.at);
   }
 
-  /** Android-Widget: Anzahl heute fälliger und überfälliger Aufgaben */
+  /** Android-Widgets: Anzahl fälliger Aufgaben und die offenen To-dos für die Liste */
   updateWidget() {
     const tools = this.app.api.native ? this.app.api.plugins?.AleTools : null;
     if (!tools?.updateWidget) return;
-    const open = this.todos.filter((t) => !t.checked && t.due), day = todayKey();
-    tools.updateWidget({ today: open.filter((t) => t.due === day).length, overdue: open.filter((t) => t.due < day).length }).catch(() => {});
+    const day = todayKey();
+    const open = this.todos.filter((t) => !t.checked);
+    const dated = open.filter((t) => t.due);
+    const todos = [...dated, ...open.filter((t) => !t.due)].slice(0, 60).map((t) => ({
+      path: t.path, id: t.id, text: t.text || 'Aufgabe', note: `${t.icon || '📄'} ${t.note}`,
+      label: dueLabel(t.due, t.time), state: dueState(t.due, false), bell: reminderOffsets(t, this.settings).length > 0,
+      nids: this.notificationIds(t)
+    }));
+    tools.updateWidget({
+      today: dated.filter((t) => t.due === day).length, overdue: dated.filter((t) => t.due < day).length,
+      todos: JSON.stringify(todos)
+    }).catch(() => {});
   }
 
   /** Browser & Windows: fällige Erinnerungen anzeigen */
@@ -105,16 +141,26 @@ export class ReminderService {
       if (perm.display !== 'granted' && (await LN.requestPermissions()).display !== 'granted') return;
       await LN.schedule({
         notifications: list.map((t) => ({
-          id: numId(t.key), title: '⏰ ' + (t.text || 'Aufgabe'), body: `${t.note} · fällig ${dueLabel(t.due, t.time)}`,
+          id: numId(t.key), title: '⏰ ' + (t.text || 'Aufgabe'), body: this.body(t),
           schedule: { at: new Date(t.at), allowWhileIdle: true }, extra: { path: t.path, id: t.id }
         }))
       });
     } catch (err) { console.error('Erinnerungen', err); }
   }
 
+  body(t) {
+    return `${t.note} · fällig ${dueLabel(t.due, t.time || (t.offset ? this.settings.defaultTime : ''))}`;
+  }
+
+  /** IDs der Android-Benachrichtigungen je To-do (damit das Widget sie beim Abhaken absagen kann) */
+  notificationIds(t) {
+    const rs = this.settings;
+    return reminderOffsets(t, rs).map((off) => numId(`${t.path}#${t.id}@${t.due}${t.time || ''}` + (off ? '-' + off : '')));
+  }
+
   fire(t) {
     const title = '⏰ ' + (t.text || 'Aufgabe');
-    const body = `${t.note} · fällig ${dueLabel(t.due, t.time)}`;
+    const body = this.body(t);
     try {
       if ('Notification' in window && Notification.permission === 'granted') {
         const n = new Notification(title, { body, tag: t.key, icon: 'app-icon.png' });
@@ -142,7 +188,7 @@ export class ReminderService {
   }
 
   snooze(t, minutes) {
-    const key = `${t.path}#${t.id}@${t.due}${t.time || ''}`;
+    const key = t.key || `${t.path}#${t.id}@${t.due}${t.time || ''}`;
     this.snoozed[key] = Date.now() + minutes * 6e4;
     this.fired.delete(key);
     store.set('snoozed', this.snoozed);

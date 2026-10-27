@@ -997,6 +997,39 @@ body.ai-open .icon-btn.ai-btn { background: color-mix(in srgb, var(--accent) 15%
 .qn-time { color: var(--text-3); font-variant-numeric: tabular-nums; font-size: .88em; margin-right: 2px; }
 @media (hover: none) { .todo-due { opacity: .6; } }
 
+/* Erinnerungs-Glocke im To-do */
+.todo-bell {
+  display: inline-flex; align-items: center; gap: 3px; flex: none; align-self: center; margin-left: 4px;
+  height: 22px; padding: 0 6px; border-radius: 6px; font-size: 12px; color: var(--text-3);
+  opacity: 0; transition: opacity .15s, background .15s; user-select: none;
+}
+.todo-bell span:empty { display: none; }
+.block:hover .todo-bell, .todo-bell:focus-visible { opacity: .8; }
+.todo-bell:hover { background: var(--bg-hover); color: var(--text-2); opacity: 1; }
+.todo-bell.on { opacity: 1; color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent); }
+.list-row.todo.done .todo-bell { display: none; }
+@media (hover: none) { .todo-bell { opacity: .6; } .todo-bell.on { opacity: 1; } }
+
+.rp-popover { padding: 10px; width: 300px; max-width: calc(100vw - 16px); box-sizing: border-box; z-index: 3500; overflow: hidden; }
+.remindpicker { display: flex; flex-direction: column; gap: 8px; }
+.rp-head { display: flex; align-items: center; gap: 6px; color: var(--text); }
+.rp-head .icon { color: var(--accent); }
+.rp-hint { margin: 0; }
+.rp-list { display: flex; flex-direction: column; gap: 2px; }
+.rp-opt { display: flex; align-items: center; gap: 9px; padding: 7px 8px; border-radius: 8px; text-align: left; color: var(--text-2); }
+.rp-opt:hover { background: var(--bg-hover); }
+.rp-opt.on { color: var(--text); }
+.rp-opt.past:not(.on) { opacity: .5; }
+.rp-box { width: 18px; height: 18px; border-radius: 5px; border: 1.5px solid var(--border-strong, var(--border)); display: grid; place-items: center; flex: none; color: #fff; }
+.rp-opt.on .rp-box { background: var(--accent); border-color: var(--accent); }
+.rp-label { flex: 1; }
+.rp-when { font-variant-numeric: tabular-nums; }
+.rp-custom { display: flex; align-items: center; gap: 6px; border-top: 1px solid var(--border); padding-top: 8px; }
+.rp-custom .rp-num { width: 54px; flex: none; height: 30px; padding: 0 6px; }
+.rp-custom .rp-unit { flex: 1; min-width: 0; width: auto; height: 30px; padding-right: 22px; }
+.rp-custom .icon-btn { flex: none; }
+.rp-foot { display: flex; align-items: center; gap: 6px; }
+
 /* Datumswähler */
 .dp-popover { padding: 10px; width: 272px; max-width: none; z-index: 3500; }
 .datepicker { display: flex; flex-direction: column; gap: 8px; }

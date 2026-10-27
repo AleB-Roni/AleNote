@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Abgehakte Checkbox (AleNote-Lila) -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="22dp" android:height="22dp" android:viewportWidth="24" android:viewportHeight="24">
+    <path android:pathData="M7,3h10a4,4 0,0 1,4 4v10a4,4 0,0 1,-4 4h-10a4,4 0,0 1,-4 -4v-10a4,4 0,0 1,4 -4z" android:fillColor="#FF8B5CFF" />
+    <path android:pathData="M7.5,12.5l3,3l6,-7" android:strokeColor="#FFFFFFFF" android:strokeWidth="2.4" android:strokeLineCap="round" android:strokeLineJoin="round" android:fillColor="#00000000" />
+</vector>

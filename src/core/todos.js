@@ -34,7 +34,9 @@ export function dueState(due, done) {
 
 /** Alle To-do-Blöcke aller Notizen (auch in frei platzierten Blöcken) */
 export async function collectTodos(app) {
-  await app.saveNow();
+  // Die geöffnete Notiz wird direkt aus dem Editor gelesen – nur speichern, wenn nötig
+  // (sonst: speichern → note:save → Aufgaben zählen → speichern … in Endlosschleife)
+  if (app.dirty) await app.saveNow();
   const tplFolder = (app.settings.templateFolder || 'Vorlagen') + '/';
   const notes = app.sidebar.allNotes().filter((n) => !n.path.startsWith(tplFolder));
   const out = [];
@@ -46,7 +48,7 @@ export async function collectTodos(app) {
       if (b?.type !== 'todo') continue;
       const text = stripHtml((b.data.text || '').replace(/<span class="qn-time">[^<]*<\/span>/g, '')).trim();
       if (!text && !b.data.due) continue;
-      out.push({ path: n.path, note: n.name, icon: n.icon || data.icon || '', id: b.id, text, html: b.data.text || '', checked: !!b.data.checked, due: b.data.due || '', time: b.data.dueTime || '' });
+      out.push({ path: n.path, note: n.name, icon: n.icon || data.icon || '', id: b.id, text, html: b.data.text || '', checked: !!b.data.checked, due: b.data.due || '', time: b.data.dueTime || '', remind: Array.isArray(b.data.remind) ? b.data.remind : [] });
     }
   }));
   return out.sort((a, b) => (a.due || '9999').localeCompare(b.due || '9999') || (a.time || '99').localeCompare(b.time || '99') || a.note.localeCompare(b.note, 'de'));

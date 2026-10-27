@@ -15,4 +15,14 @@
     </plurals>
     <string name="shortcut_dictate">Diktieren</string>
     <string name="shortcut_calendar">Kalender</string>
+    <string name="todos_title">To-dos</string>
+    <string name="todos_description">Offene Aufgaben lesen und abhaken</string>
+    <string name="todos_empty">Keine offenen To-dos 🎉</string>
+    <string name="todos_first">Öffne AleNote einmal, damit deine To-dos hier erscheinen.</string>
+    <string name="todos_add">Neues To-do</string>
+    <string name="todos_check">Abhaken</string>
+    <plurals name="todos_open">
+        <item quantity="one">%d offen</item>
+        <item quantity="other">%d offen</item>
+    </plurals>
 </resources>

@@ -3,6 +3,7 @@ package com.alenote.app;
 import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.net.Uri;
 import android.print.PrintAttributes;
 import android.print.PrintDocumentAdapter;
@@ -25,13 +26,17 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.util.ArrayList;
 
+import org.json.JSONArray;
+import org.json.JSONObject;
+
 /**
  * Hilfen für Export auf dem Handy:
  *  - print:     Android-Druckdialog für die aktuelle Seite (dort „Als PDF speichern“)
  *  - shareFile: Datei (Base64) über das Teilen-Menü weitergeben bzw. speichern
  *  - speechToText: Spracherkennung von Android (wie bei der Tastatur, ohne API-Schlüssel)
  *  - getLaunchAction / Ereignis „launchAction“: Start über Kachel, Widget oder App-Verknüpfung
- *  - updateWidget: Zahl der heute fälligen/überfälligen Aufgaben für das Widget
+ *  - updateWidget: fällige Aufgaben für das Schnellnotiz-Widget und die Liste fürs To-do-Widget
+ *  - takeWidgetToggles / Ereignis „widgetToggle“: im To-do-Widget abgehakte Aufgaben
  */
 @CapacitorPlugin(name = "AleTools")
 public class AleToolsPlugin extends Plugin {
@@ -52,6 +57,27 @@ public class AleToolsPlugin extends Plugin {
         return true;
     }
 
+    /** Im To-do-Widget wurde etwas abgehakt (TodoWidget.onReceive) */
+    public static void emitWidgetToggle() {
+        AleToolsPlugin p = instance;
+        if (p == null || p.getBridge() == null || !p.hasListeners("widgetToggle")) return;
+        p.notifyListeners("widgetToggle", new JSObject());
+    }
+
+    /** Im Widget abgehakte Aufgaben abholen (die App übernimmt sie in die Notizen) */
+    @PluginMethod
+    public void takeWidgetToggles(PluginCall call) {
+        SharedPreferences p = getContext().getSharedPreferences(TodoWidget.PREFS, Context.MODE_PRIVATE);
+        String items;
+        synchronized (TodoWidget.class) {
+            items = p.getString(TodoWidget.KEY_TOGGLES, "[]");
+            p.edit().remove(TodoWidget.KEY_TOGGLES).commit();
+        }
+        JSObject ret = new JSObject();
+        ret.put("items", items);
+        call.resolve(ret);
+    }
+
     @PluginMethod
     public void getLaunchAction(PluginCall call) {
         JSObject ret = new JSObject();
@@ -62,11 +88,33 @@ public class AleToolsPlugin extends Plugin {
 
     @PluginMethod
     public void updateWidget(PluginCall call) {
-        getContext().getSharedPreferences("alenote", Context.MODE_PRIVATE).edit()
+        SharedPreferences p = getContext().getSharedPreferences(TodoWidget.PREFS, Context.MODE_PRIVATE);
+        synchronized (TodoWidget.class) {
+        SharedPreferences.Editor e = p.edit()
             .putInt("widget_today", call.getInt("today", 0))
-            .putInt("widget_overdue", call.getInt("overdue", 0))
-            .apply();
+            .putInt("widget_overdue", call.getInt("overdue", 0));
+        String todos = call.getString("todos");
+        if (todos != null) {
+            // Noch nicht übernommene Haken aus dem Widget beibehalten
+            try {
+                JSONArray list = new JSONArray(todos);
+                JSONArray queue = new JSONArray(p.getString(TodoWidget.KEY_TOGGLES, "[]"));
+                for (int i = 0; i < list.length(); i++) {
+                    JSONObject t = list.getJSONObject(i);
+                    for (int j = 0; j < queue.length(); j++) {
+                        JSONObject q = queue.getJSONObject(j);
+                        if (q.optString("path").equals(t.optString("path")) && q.optString("id").equals(t.optString("id"))) t.put("checked", q.optBoolean("checked"));
+                    }
+                }
+                todos = list.toString();
+            } catch (Exception ignored) {
+            }
+            e.putString(TodoWidget.KEY_TODOS, todos);
+        }
+        e.commit();
+        }
         QuickNoteWidget.refresh(getContext());
+        TodoWidget.refresh(getContext());
         call.resolve();
     }
 
