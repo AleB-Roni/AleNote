@@ -18,5 +18,7 @@
 
     <style name="AppTheme.NoActionBarLaunch" parent="Theme.SplashScreen">
         <item name="android:background">@drawable/splash</item>
+        <!-- Android 12+: Startbildschirm mit App-Icon auf dunklem Hintergrund -->
+        <item name="windowSplashScreenBackground">#17171C</item>
     </style>
 </resources>
