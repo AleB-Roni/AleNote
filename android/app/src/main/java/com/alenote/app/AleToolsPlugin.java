@@ -1,28 +1,35 @@
 package com.alenote.app;
 
+import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
 import android.print.PrintAttributes;
 import android.print.PrintDocumentAdapter;
 import android.print.PrintManager;
+import android.speech.RecognizerIntent;
 import android.util.Base64;
 import android.webkit.WebView;
 
+import androidx.activity.result.ActivityResult;
 import androidx.core.content.FileProvider;
 
+import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
+import com.getcapacitor.annotation.ActivityCallback;
 import com.getcapacitor.annotation.CapacitorPlugin;
 
 import java.io.File;
 import java.io.FileOutputStream;
+import java.util.ArrayList;
 
 /**
  * Hilfen für Export auf dem Handy:
  *  - print:     Android-Druckdialog für die aktuelle Seite (dort „Als PDF speichern“)
  *  - shareFile: Datei (Base64) über das Teilen-Menü weitergeben bzw. speichern
+ *  - speechToText: Spracherkennung von Android (wie bei der Tastatur, ohne API-Schlüssel)
  */
 @CapacitorPlugin(name = "AleTools")
 public class AleToolsPlugin extends Plugin {
@@ -41,6 +48,33 @@ public class AleToolsPlugin extends Plugin {
                 call.reject("Drucken nicht möglich: " + e.getMessage());
             }
         });
+    }
+
+    @PluginMethod
+    public void speechToText(PluginCall call) {
+        Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
+        intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
+        intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, call.getString("language", "de-DE"));
+        intent.putExtra(RecognizerIntent.EXTRA_PROMPT, call.getString("prompt", "Sprich jetzt …"));
+        intent.putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1);
+        if (intent.resolveActivity(getContext().getPackageManager()) == null) {
+            call.reject("Auf diesem Handy ist keine Spracherkennung installiert (z.B. Google-App)");
+            return;
+        }
+        startActivityForResult(call, intent, "speechResult");
+    }
+
+    @ActivityCallback
+    private void speechResult(PluginCall call, ActivityResult result) {
+        if (call == null) return;
+        JSObject ret = new JSObject();
+        String text = "";
+        if (result.getResultCode() == Activity.RESULT_OK && result.getData() != null) {
+            ArrayList<String> list = result.getData().getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS);
+            if (list != null && !list.isEmpty()) text = list.get(0);
+        }
+        ret.put("text", text);
+        call.resolve(ret);
     }
 
     @PluginMethod

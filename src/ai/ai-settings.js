@@ -4,7 +4,7 @@ import { icon } from '../ui/icons.js';
 import { toast, confirmDialog } from '../ui/overlays.js';
 import { PROVIDERS, streamChat } from './providers.js';
 import { DEFAULT_ACTIONS, SCOPE_LABELS, OUTPUT_LABELS } from './ai.js';
-import { dictateSettings, dictationMethod } from './dictate.js';
+import { dictateSettings, dictationMethod, deviceSRAvailable } from './dictate.js';
 
 export function renderAISettings(app, page, rerender, { shortcutRecorder, toggle, select }) {
   const ai = app.ai;
@@ -56,9 +56,11 @@ export function renderAISettings(app, page, rerender, { shortcutRecorder, toggle
   const ds = dictateSettings(app);
   const setD = (patch) => { cfg.dictate = { ...ds, ...patch }; ai.save(); };
   const method = dictationMethod(app);
-  page.append(section('Diktieren', 'Sprechen statt tippen: Mikrofon-Knopf in der Schnellnotiz, „/diktieren“ oder <kbd>Strg</kbd><kbd>Shift</kbd><kbd>M</kbd>. Die Aufnahme wird von OpenAI, Groq oder Gemini in Text umgewandelt (Schlüssel oben hinterlegen).'));
-  page.append(h('div.set-row', {}, h('div.set-label', {}, h('div', { text: 'Spracherkennung' }), h('div.muted.small', { text: method ? (method.kind === 'browser' ? 'Aktiv: Spracherkennung des Browsers' : 'Aktiv: ' + PROVIDERS[method.provider].name) : 'Noch nicht eingerichtet – Schlüssel für OpenAI, Groq oder Gemini hinterlegen' })),
-    h('div.set-control', {}, select([['auto', 'Automatisch'], ['openai', 'OpenAI (Whisper)'], ['groq', 'Groq (Whisper, sehr schnell)'], ['gemini', 'Gemini'], ['browser', 'Browser (Chrome/Edge/Safari)']], ds.provider, (v) => { setD({ provider: v }); rerender(); }))));
+  page.append(section('Diktieren', deviceSRAvailable(app)
+    ? 'Sprechen statt tippen: Mikrofon-Knopf in der Schnellnotiz oder „/diktieren“. Auf dem Handy nutzt AleNote die Spracherkennung von Android – kostenlos und ohne Schlüssel. Alternativ OpenAI, Groq oder Gemini.'
+    : 'Sprechen statt tippen: Mikrofon-Knopf in der Schnellnotiz, „/diktieren“ oder <kbd>Strg</kbd><kbd>Shift</kbd><kbd>M</kbd>. Die Aufnahme wird von OpenAI, Groq oder Gemini in Text umgewandelt (Schlüssel oben hinterlegen).'));
+  page.append(h('div.set-row', {}, h('div.set-label', {}, h('div', { text: 'Spracherkennung' }), h('div.muted.small', { text: method ? (method.kind === 'browser' ? 'Aktiv: Spracherkennung des Browsers' : method.kind === 'device' ? 'Aktiv: Spracherkennung des Handys (kostenlos, ohne Schlüssel)' : 'Aktiv: ' + PROVIDERS[method.provider].name) : 'Noch nicht eingerichtet – Schlüssel für OpenAI, Groq oder Gemini hinterlegen' })),
+    h('div.set-control', {}, select([['auto', deviceSRAvailable(app) ? 'Automatisch (Handy-Spracherkennung)' : 'Automatisch'], ...(deviceSRAvailable(app) ? [['device', 'Handy (Android, kostenlos)']] : []), ['openai', 'OpenAI (Whisper)'], ['groq', 'Groq (Whisper, sehr schnell)'], ['gemini', 'Gemini'], ...(app.api.native ? [] : [['browser', 'Browser (Chrome/Edge/Safari)']])], ds.provider, (v) => { setD({ provider: v }); rerender(); }))));
   page.append(h('div.set-row', {}, h('div.set-label', {}, h('div', { text: 'Sprache' })),
     h('div.set-control', {}, select([['de', 'Deutsch'], ['en', 'Englisch'], ['fr', 'Französisch'], ['it', 'Italienisch'], ['es', 'Spanisch'], ['auto', 'Automatisch erkennen']], ds.language, (v) => setD({ language: v })))));
   page.append(h('div.set-row', {}, h('div.set-label', {}, h('div', { text: 'Text mit KI bereinigen' }), h('div.muted.small', { text: 'Satzzeichen, Füllwörter („äh“) und Erkennungsfehler korrigiert der Standard-Anbieter' })),
@@ -81,7 +83,7 @@ export function renderAISettings(app, page, rerender, { shortcutRecorder, toggle
     const up = h('button.icon-btn', { title: 'Nach oben', disabled: i === 0, onclick: () => { cfg.actions.splice(i - 1, 0, cfg.actions.splice(i, 1)[0]); ai.save(); rerender(); } }, icon('chevronUp', 15));
     const run = h('button.btn.small', { title: 'Jetzt auf die geöffnete Notiz anwenden', onclick: () => { document.querySelector('.modal-backdrop .modal-header .icon-btn')?.click(); setTimeout(() => ai.run(a), 250); } }, icon('zap', 13), 'Ausführen');
     card.append(
-      h('div.hotkey-top', {}, emoji, name, shortcutRecorder(app, a.shortcut || '', (v) => { a.shortcut = v; ai.save(); }, { exceptId: 'ai:' + a.id }), up, del),
+      h('div.hotkey-top', {}, emoji, name, app.api.isMobile ? null : shortcutRecorder(app, a.shortcut || '', (v) => { a.shortcut = v; ai.save(); }, { exceptId: 'ai:' + a.id }), up, del),
       prompt,
       h('div.ai-action-opts', {},
         h('label.ai-opt', {}, h('span', { text: 'Bereich' }), select(Object.entries(SCOPE_LABELS), a.scope || 'auto', (v) => { a.scope = v; ai.save(); })),

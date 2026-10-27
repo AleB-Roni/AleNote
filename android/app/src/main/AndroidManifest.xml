@@ -36,6 +36,16 @@
         </provider>
     </application>
 
+    <!-- Android 11+: Spracherkennung des Systems finden dürfen (Diktieren) -->
+    <queries>
+        <intent>
+            <action android:name="android.speech.action.RECOGNIZE_SPEECH" />
+        </intent>
+        <intent>
+            <action android:name="android.speech.RecognitionService" />
+        </intent>
+    </queries>
+
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />

@@ -1349,3 +1349,34 @@ body.is-web .ai-panel-head { padding-right: 14px; }
 .dictate-stop { display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 14px; border-radius: 99px; color: #fff; font-weight: 600; background: linear-gradient(135deg, var(--accent), var(--accent-2)); }
 .dictate-stop:disabled { opacity: .6; }
 .qn-mic.recording { color: #ef4444; border-color: #ef4444; }
+
+/* Einstellungen auf schmalen Bildschirmen: nichts darf breiter als der Bildschirm werden */
+.settings, .settings-body, .settings-page, .set-label { min-width: 0; }
+.set-control { max-width: 100%; }
+.set-control .select, .set-control .input { max-width: 100%; }
+@media (max-width: 760px) {
+  .settings-modal { width: 100vw !important; height: 100% !important; max-height: none; border-radius: 0; }
+  .settings-modal .modal-body { min-height: 0; }
+  .settings-nav { min-width: 0; scrollbar-width: none; }
+  .settings-nav::-webkit-scrollbar { display: none; }
+  .set-row { gap: 8px 12px; }
+  .set-label { flex: 1 1 60%; }
+  .set-control { flex: 0 1 auto; margin-left: auto; }
+  .set-row:has(.select, .shortcut-rec, .set-stack) .set-label { flex-basis: 100%; }
+  .set-row:has(.select, .shortcut-rec, .set-stack) .set-control { flex-basis: 100%; display: flex; justify-content: flex-end; }
+  .set-row .select { width: 100%; }
+  .ai-provider-body .row-inline { flex-wrap: wrap; }
+  .hotkey-top { flex-wrap: wrap; }
+  .hotkey-top .input { min-width: 0; flex: 1 1 60%; }
+  .ai-action-opts .ai-opt { flex: 1 1 100%; }
+  .shortcut-row .shortcut-rec { min-width: 90px; }
+}
+
+/* Schnellnotiz: Mikrofon im Textfeld */
+.qn-textwrap { position: relative; }
+.qn-textwrap .qn-text { padding-right: 58px; }
+.qn-mic { position: absolute; right: 10px; bottom: 10px; width: 42px; height: 42px; border-radius: 50%; display: grid; place-items: center; color: #fff;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2)); box-shadow: 0 4px 14px color-mix(in srgb, var(--accent) 45%, transparent); transition: transform .15s var(--spring), filter .15s; }
+.qn-mic:hover { filter: brightness(1.1); transform: scale(1.06); }
+.qn-mic:active { transform: scale(.94); }
+@media (pointer: coarse) { .qn-mic { width: 50px; height: 50px; } .qn-textwrap .qn-text { padding-right: 66px; } }

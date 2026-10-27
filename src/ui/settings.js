@@ -28,6 +28,10 @@ export function openSettings(app, tab = 'appearance') {
     ['vault', 'Vault', 'vault'],
     ['about', 'Über', 'star']
   ];
+  // Auf dem Handy gibt es keine Tastenkürzel
+  const mobile = !!app.api.isMobile;
+  const shown = tabs.filter(([id]) => !(mobile && id === 'hotkeys'));
+  if (mobile && tab === 'hotkeys') tab = 'appearance';
   const nav = h('div.settings-nav');
   const body = h('div.settings-body');
   const content = h('div.settings', {}, nav, body);
@@ -41,7 +45,7 @@ export function openSettings(app, tab = 'appearance') {
     body.append(page);
     body.scrollTop = 0;
   };
-  for (const [id, label, ic] of tabs) {
+  for (const [id, label, ic] of shown) {
     nav.append(h('button.settings-tab', { dataset: { tab: id }, onclick: () => show(id) }, icon(ic, 16), h('span', { text: label })));
   }
   show(tab);
@@ -252,7 +256,7 @@ function quick(app, page, rerender) {
   page.append(row('Ziel-Notiz', 'Standard für neue Einträge. Im Schnellnotiz-Fenster kannst du jedes Mal eine andere wählen.', select(opts, qs.target, (v) => set({ target: v }))));
   page.append(row('Neue Einträge', null, select([['bottom', 'Unten anhängen (chronologisch)'], ['top', 'Oben einfügen (neueste zuerst)']], qs.order, (v) => set({ order: v }))));
   page.append(row('Standardmäßig als To-do', 'Einträge werden als Aufgabe mit Checkbox gespeichert', toggle(!!qs.asTodo, (v) => set({ asTodo: v }))));
-  page.append(row('Tastenkürzel in AleNote', 'Öffnet die Schnellnotiz im App-Fenster', shortcutRecorder(app, app.hotkeys.shortcutFor('core.quickNote'), (v) => { app.saveSettings({ shortcutOverrides: { ...app.hotkeys.overrides, 'core.quickNote': v } }); }, { exceptId: 'core.quickNote' })));
+  if (!app.api.isMobile) page.append(row('Tastenkürzel in AleNote', 'Öffnet die Schnellnotiz im App-Fenster', shortcutRecorder(app, app.hotkeys.shortcutFor('core.quickNote'), (v) => { app.saveSettings({ shortcutOverrides: { ...app.hotkeys.overrides, 'core.quickNote': v } }); }, { exceptId: 'core.quickNote' })));
   if (desktop) {
     const status = h('div.muted.small');
     const showStatus = async () => {
@@ -268,8 +272,8 @@ function quick(app, page, rerender) {
   }
 
   page.append(section('Kalender', 'Zeigt alle To-dos mit Fälligkeitsdatum aus deinen Notizen. Jeder Benutzer sieht nur seine eigenen Aufgaben.'));
-  page.append(row('Tastenkürzel', null, shortcutRecorder(app, app.hotkeys.shortcutFor('core.calendar'), (v) => app.saveSettings({ shortcutOverrides: { ...app.hotkeys.overrides, 'core.calendar': v } }), { exceptId: 'core.calendar' })));
-  page.append(row('Fälligkeitsdatum setzen', 'Im To-do auf 📅 klicken, „/To-do mit Datum“ oder dieses Kürzel', shortcutRecorder(app, app.hotkeys.shortcutFor('core.todoDue'), (v) => app.saveSettings({ shortcutOverrides: { ...app.hotkeys.overrides, 'core.todoDue': v } }), { exceptId: 'core.todoDue' })));
+  if (!app.api.isMobile) page.append(row('Tastenkürzel', null, shortcutRecorder(app, app.hotkeys.shortcutFor('core.calendar'), (v) => app.saveSettings({ shortcutOverrides: { ...app.hotkeys.overrides, 'core.calendar': v } }), { exceptId: 'core.calendar' })));
+  page.append(row('Fälligkeitsdatum setzen', app.api.isMobile ? 'Im To-do auf 📅 tippen oder „/To-do mit Datum“' : 'Im To-do auf 📅 klicken, „/To-do mit Datum“ oder dieses Kürzel', app.api.isMobile ? h('span') : shortcutRecorder(app, app.hotkeys.shortcutFor('core.todoDue'), (v) => app.saveSettings({ shortcutOverrides: { ...app.hotkeys.overrides, 'core.todoDue': v } }), { exceptId: 'core.todoDue' })));
   page.append(h('div.row-gap', {}, h('button.btn.btn-primary', { onclick: () => { document.querySelector('.settings-modal')?.closest('.modal-backdrop')?.querySelector('.modal-header .icon-btn')?.click(); app.openCalendar(); } }, icon('calendar', 15), 'Kalender öffnen')));
 }
 
@@ -285,9 +289,9 @@ function reminders(app, page, rerender) {
   page.append(row('Wann erinnern?', null, select([['0', 'Zur Fälligkeit'], ['5', '5 Minuten vorher'], ['15', '15 Minuten vorher'], ['30', '30 Minuten vorher'], ['60', '1 Stunde vorher'], ['1440', '1 Tag vorher']], String(rs.before), (v) => set({ before: Number(v) }))));
   page.append(row('Tagesübersicht', 'Beim ersten Öffnen am Tag: was heute fällig oder überfällig ist', toggle(rs.daily, (v) => set({ daily: v }))));
 
-  if (api.native) {
+  if (api.isMobile) {
     page.append(h('p.muted.small', { text: 'Auf dem Handy kommen Erinnerungen auch, wenn AleNote geschlossen ist. Beim ersten Mal fragt Android nach der Erlaubnis für Benachrichtigungen.' }));
-  } else if (api.isWeb || api.platform === 'browser') {
+  } else if (!window.alenoteNative) {
     const st = h('span.small');
     const show = () => {
       const p = 'Notification' in window ? Notification.permission : 'unsupported';

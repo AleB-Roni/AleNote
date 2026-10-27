@@ -60,14 +60,14 @@ export function quickNoteForm({ notes, qs, preset = {}, onSubmit, onCancel, dict
   }));
 
   // Diktieren: Text an der Cursorposition einfügen
-  const micBtn = dictate ? h('button.pill.qn-mic', { title: 'Diktieren (Sprache → Text)', onclick: () => dictate((t) => {
+  const micBtn = dictate ? h('button.qn-mic', { title: 'Diktieren – sprechen statt tippen', 'aria-label': 'Diktieren', onmousedown: (e) => e.preventDefault(), onclick: () => dictate((t) => {
     const a = text.selectionStart ?? text.value.length, b = text.selectionEnd ?? a;
     const before = text.value.slice(0, a), after = text.value.slice(b);
     const ins = (before && !/\s$/.test(before) ? ' ' : '') + t;
     text.value = before + ins + after;
     text.focus();
     text.setSelectionRange((before + ins).length, (before + ins).length);
-  }) }, icon('mic', 14), h('span', { text: 'Diktieren' })) : null;
+  }) }, icon('mic', 20)) : null;
 
   const save = h('button.btn.btn-primary.qn-save', {}, icon('check', 15), 'Speichern');
   const submit = async () => {
@@ -84,8 +84,8 @@ export function quickNoteForm({ notes, qs, preset = {}, onSubmit, onCancel, dict
 
   const el = h('div.quicknote', {},
     h('div.qn-head', {}, h('span.qn-logo', {}, icon('zap', 15)), h('b', { text: 'Schnellnotiz' }), h('div.flex'), clock),
-    text,
-    h('div.qn-opts', {}, h('label.qn-where', {}, icon('file', 14), target), todoBtn, dueBtn, micBtn),
+    h('div.qn-textwrap', {}, text, micBtn),
+    h('div.qn-opts', {}, h('label.qn-where', {}, icon('file', 14), target), todoBtn, dueBtn),
     h('div.qn-foot', {}, h('span.muted.small', { html: '<kbd>Enter</kbd> speichern · <kbd>Shift</kbd><kbd>Enter</kbd> neue Zeile · <kbd>Esc</kbd> schließen' }), h('div.flex'), save));
   el.focusText = () => { text.focus(); text.setSelectionRange(text.value.length, text.value.length); };
   return el;

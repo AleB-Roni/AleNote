@@ -1,7 +1,8 @@
 // Diktieren: Sprache aufnehmen und in Text umwandeln.
 // 1) Aufnahme im Gerät + Umwandlung durch OpenAI (Whisper), Groq (Whisper) oder Gemini
 //    – funktioniert auf Windows, Android und im Browser.
-// 2) Ersatzweise die Spracherkennung des Browsers (Chrome, Edge, Safari).
+// 2) Android: die Spracherkennung des Handys (wie bei der Tastatur, kostenlos, ohne Schlüssel).
+// 3) Ersatzweise die Spracherkennung des Browsers (Chrome, Edge, Safari).
 // Danach kann die KI den Text bereinigen (Satzzeichen, Füllwörter, Erkennungsfehler).
 import { h } from '../core/utils.js';
 import { icon } from '../ui/icons.js';
@@ -18,12 +19,19 @@ const browserSRAvailable = () => !!BrowserSR && !window.alenoteNative && !window
 
 export function dictateSettings(app) { return { ...DICTATE_DEFAULTS, ...(app.settings.ai?.dictate || {}) }; }
 
+/** Android-App: Spracherkennung des Systems verfügbar? */
+export const deviceSRAvailable = (app) => !!(app.api?.native && app.api.plugins?.AleTools);
+const LANG_TAGS = { de: 'de-DE', en: 'en-US', fr: 'fr-FR', it: 'it-IT', es: 'es-ES' };
+
 /** Welcher Weg wird genutzt? → { kind: 'cloud', provider } | { kind: 'browser' } | null */
 export function dictationMethod(app) {
   const ds = dictateSettings(app);
   const ai = app.ai;
   const hasKey = (id) => !!ai?.cfg.providers[id]?.apiKey;
   if (ds.provider === 'browser') return browserSRAvailable() ? { kind: 'browser' } : null;
+  if (ds.provider === 'device') return deviceSRAvailable(app) ? { kind: 'device' } : null;
+  // Android: „Automatisch“ = kostenlose Spracherkennung des Handys
+  if (ds.provider === 'auto' && deviceSRAvailable(app)) return { kind: 'device' };
   if (STT.includes(ds.provider)) return hasKey(ds.provider) ? { kind: 'cloud', provider: ds.provider } : null;
   const id = STT.find(hasKey);
   if (id) return { kind: 'cloud', provider: id };
@@ -103,6 +111,18 @@ export async function startDictation(app, { onText, anchor } = {}) {
   }
   const ds = dictateSettings(app);
   const lang = ds.language === 'auto' ? '' : ds.language;
+
+  // ---- Android: Spracherkennung des Systems (eigener Dialog von Android) ----
+  if (method.kind === 'device') {
+    try {
+      const r = await app.api.plugins.AleTools.speechToText({ language: LANG_TAGS[lang] || lang || navigator.language || 'de-DE', prompt: 'Sprich jetzt …' });
+      let text = String(r?.text || '').trim();
+      if (!text) return null;
+      if (ds.cleanup && app.ai?.isConfigured?.()) { toast('KI bereinigt den Text …', { duration: 1500 }); text = await cleanupText(app, text); }
+      onText?.(text);
+    } catch (err) { toast('Spracherkennung: ' + (err.message || err), { type: 'error', duration: 4000 }); }
+    return null;
+  }
 
   // ---- Leiste ----
   const timeEl = h('span.dictate-time', { text: '0:00' });
