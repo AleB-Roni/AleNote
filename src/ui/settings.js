@@ -2,6 +2,7 @@
 import { h } from '../core/utils.js';
 import { renderAISettings } from '../ai/ai-settings.js';
 import { quickSettings } from '../core/todos.js';
+import { remindSettings } from '../core/reminders.js';
 import { icon } from './icons.js';
 import { modal, toast, confirmDialog } from './overlays.js';
 import { eventToShortcut, shortcutHtml } from '../core/shortcuts.js';
@@ -20,6 +21,7 @@ export function openSettings(app, tab = 'appearance') {
     ['editor', 'Editor', 'edit'],
     ['hotkeys', 'Hotkeys', 'keyboard'],
     ['quick', 'Schnellnotiz', 'zap'],
+    ['reminders', 'Erinnerungen', 'clock'],
     ['ai', 'KI', 'sparkles'],
     ['account', 'Konto & Sync', 'user'],
     ['plugins', 'Plugins', 'puzzle'],
@@ -35,7 +37,7 @@ export function openSettings(app, tab = 'appearance') {
     nav.querySelectorAll('.settings-tab').forEach((b) => b.classList.toggle('active', b.dataset.tab === id));
     body.innerHTML = '';
     const page = h('div.settings-page');
-    ({ appearance, editor, hotkeys, quick, ai, account, plugins, vault, about })[id](app, page, () => show(id), m);
+    ({ appearance, editor, hotkeys, quick, reminders, ai, account, plugins, vault, about })[id](app, page, () => show(id), m);
     body.append(page);
     body.scrollTop = 0;
   };
@@ -269,6 +271,53 @@ function quick(app, page, rerender) {
   page.append(row('Tastenkürzel', null, shortcutRecorder(app, app.hotkeys.shortcutFor('core.calendar'), (v) => app.saveSettings({ shortcutOverrides: { ...app.hotkeys.overrides, 'core.calendar': v } }), { exceptId: 'core.calendar' })));
   page.append(row('Fälligkeitsdatum setzen', 'Im To-do auf 📅 klicken, „/To-do mit Datum“ oder dieses Kürzel', shortcutRecorder(app, app.hotkeys.shortcutFor('core.todoDue'), (v) => app.saveSettings({ shortcutOverrides: { ...app.hotkeys.overrides, 'core.todoDue': v } }), { exceptId: 'core.todoDue' })));
   page.append(h('div.row-gap', {}, h('button.btn.btn-primary', { onclick: () => { document.querySelector('.settings-modal')?.closest('.modal-backdrop')?.querySelector('.modal-header .icon-btn')?.click(); app.openCalendar(); } }, icon('calendar', 15), 'Kalender öffnen')));
+}
+
+function reminders(app, page, rerender) {
+  const rs = remindSettings(app);
+  const set = (patch) => app.saveSettings({ reminders: { ...(app.settings.reminders || {}), ...patch } });
+  const api = app.api;
+  page.append(section('Erinnerungen', 'AleNote erinnert dich an To-dos mit Fälligkeitsdatum. Ohne Uhrzeit wird zur Standardzeit am Fälligkeitstag erinnert.'));
+  page.append(row('Erinnerungen aktiv', null, toggle(rs.enabled, (v) => set({ enabled: v }))));
+  const time = h('input.input', { type: 'time', value: rs.defaultTime, style: { width: '120px' } });
+  time.addEventListener('change', () => set({ defaultTime: time.value || '09:00' }));
+  page.append(row('Standardzeit', 'Für To-dos mit Datum, aber ohne Uhrzeit', time));
+  page.append(row('Wann erinnern?', null, select([['0', 'Zur Fälligkeit'], ['5', '5 Minuten vorher'], ['15', '15 Minuten vorher'], ['30', '30 Minuten vorher'], ['60', '1 Stunde vorher'], ['1440', '1 Tag vorher']], String(rs.before), (v) => set({ before: Number(v) }))));
+  page.append(row('Tagesübersicht', 'Beim ersten Öffnen am Tag: was heute fällig oder überfällig ist', toggle(rs.daily, (v) => set({ daily: v }))));
+
+  if (api.native) {
+    page.append(h('p.muted.small', { text: 'Auf dem Handy kommen Erinnerungen auch, wenn AleNote geschlossen ist. Beim ersten Mal fragt Android nach der Erlaubnis für Benachrichtigungen.' }));
+  } else if (api.isWeb || api.platform === 'browser') {
+    const st = h('span.small');
+    const show = () => {
+      const p = 'Notification' in window ? Notification.permission : 'unsupported';
+      st.textContent = p === 'granted' ? '✓ Benachrichtigungen erlaubt' : p === 'denied' ? '✗ Im Browser blockiert (Seiteneinstellungen)' : !window.isSecureContext ? 'Nur über HTTPS möglich – sonst erscheinen Erinnerungen nur in AleNote' : 'Noch nicht erlaubt';
+      st.className = 'small ' + (p === 'granted' ? 'ai-ok' : 'muted');
+    };
+    show();
+    page.append(row('Browser-Benachrichtigungen', 'Erinnerungen kommen, solange AleNote in einem Tab geöffnet ist', h('div.set-stack', {},
+      h('button.btn.small', { onclick: async () => { try { await Notification.requestPermission(); } catch {} show(); } }, 'Erlauben'), st)));
+  } else {
+    page.append(section('Im Hintergrund', 'Damit Erinnerungen und die globale Schnellnotiz auch bei geschlossenem Fenster funktionieren.'));
+    page.append(row('Beim Schließen im Infobereich weiterlaufen', 'Das Fenster schließen beendet AleNote nicht, sondern legt es unten rechts neben die Uhr', toggle(!!app.settings.runInTray, (v) => app.saveSettings({ runInTray: v }))));
+    page.append(row('Mit Windows starten', 'Startet unsichtbar im Infobereich (nur zusammen mit der Option oben)', toggle(!!app.settings.autostart, (v) => app.saveSettings({ autostart: v, ...(v ? { runInTray: true } : {}) }))));
+  }
+  page.append(h('div.row-gap', {}, h('button.btn', { onclick: () => testReminder(app) }, icon('clock', 15), 'Test-Erinnerung')));
+}
+
+async function testReminder(app) {
+  const t = { path: app.currentPath || '', id: '', text: 'Test-Erinnerung von AleNote', note: app.editor?.title || 'AleNote', due: new Date().toISOString().slice(0, 10), time: '', icon: '⏰' };
+  const LN = app.api.native ? app.api.plugins?.LocalNotifications : null;
+  if (LN) {
+    try {
+      if ((await LN.checkPermissions()).display !== 'granted' && (await LN.requestPermissions()).display !== 'granted') { toast('Benachrichtigungen sind für AleNote nicht erlaubt (Android-Einstellungen)', { type: 'error' }); return; }
+      await LN.schedule({ notifications: [{ id: 99, title: '⏰ ' + t.text, body: 'So sehen Erinnerungen aus', schedule: { at: new Date(Date.now() + 5000), allowWhileIdle: true } }] });
+      toast('Erinnerung kommt in 5 Sekunden – du kannst die App auch schließen', { duration: 4000 });
+    } catch (err) { toast('Fehler: ' + err.message, { type: 'error' }); }
+    return;
+  }
+  toast('Erinnerung kommt in 5 Sekunden …', { duration: 3000 });
+  setTimeout(() => app.reminders?.fire(t), 5000);
 }
 
 function ai(app, page, rerender) {

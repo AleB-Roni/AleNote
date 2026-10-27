@@ -5,6 +5,8 @@ import { contextMenu, confirmDialog, toast } from './overlays.js';
 import { todoBadge } from './calendar.js';
 import { shortcutText } from '../core/shortcuts.js';
 import { listTrash } from '../core/trash.js';
+import { openTemplatePicker } from './templates.js';
+import { openImport } from './export.js';
 
 export class Sidebar {
   constructor(app, el) {
@@ -45,7 +47,9 @@ export class Sidebar {
       e.preventDefault();
       contextMenu([
         { label: 'Neue Notiz', icon: 'filePlus', run: () => app.createNote('') },
+        { label: 'Neue Notiz aus Vorlage', icon: 'layers', run: () => app.runCommand('core.newFromTemplate') },
         { label: 'Neuer Ordner', icon: 'folderPlus', run: () => app.createFolder('') },
+        { label: 'Importieren …', icon: 'upload', run: () => app.runCommand('core.import') },
         '-',
         { label: 'Vault im Explorer öffnen', icon: 'external', run: () => app.api.openFolder('') }
       ], { x: e.clientX, y: e.clientY });
@@ -258,7 +262,9 @@ export class Sidebar {
     const app = this.app;
     contextMenu([
       { label: 'Neue Notiz', icon: 'filePlus', run: () => { this.expanded.add(f.path); app.createNote(f.path); } },
+      { label: 'Neue Notiz aus Vorlage', icon: 'layers', run: () => { this.expanded.add(f.path); openTemplatePicker(app, { mode: 'new', folder: f.path }); } },
       { label: 'Neuer Unterordner', icon: 'folderPlus', run: () => { this.expanded.add(f.path); app.createFolder(f.path); } },
+      { label: 'Hierher importieren …', icon: 'upload', run: () => { this.expanded.add(f.path); openImport(app, f.path); } },
       '-',
       { label: 'Umbenennen', icon: 'edit', run: () => this.inlineRename(f.path) },
       { label: 'Im Explorer öffnen', icon: 'external', run: () => app.api.openFolder(f.path) },

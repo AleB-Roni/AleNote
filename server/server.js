@@ -223,6 +223,24 @@ route('DELETE', '/api/sync/note', async (req, ctx, q) => {
   return vaultOf(ctx.user.id).remove(q.get('path'), { baseRev: base == null ? null : Number(base), force: q.get('force') === '1' });
 });
 
+// Kalender-Abo (iCal) für Web- und Handy-App laden (Browser dürfen fremde Kalender wegen CORS nicht direkt laden).
+// Gibt nur echte iCal-Kalender zurück.
+route('GET', '/api/ical', async (req, ctx, q) => {
+  const url = String(q.get('url') || '').trim().replace(/^webcal:/i, 'https:');
+  if (!/^https?:\/\/[^\s]+$/i.test(url)) throw A.httpError(400, 'Bitte eine http(s)- oder webcal-Adresse angeben');
+  let res;
+  try { res = await fetch(url, { signal: AbortSignal.timeout(20e3), headers: { 'User-Agent': 'AleNote-Server' } }); }
+  catch { throw A.httpError(502, 'Kalender nicht erreichbar'); }
+  if (!res.ok) throw A.httpError(502, 'Kalender antwortet mit ' + res.status);
+  const text = (await res.text()).slice(0, 15e6);
+  if (!text.includes('BEGIN:VCALENDAR')) throw A.httpError(422, 'Unter dieser Adresse liegt kein iCal-Kalender');
+  return { text };
+});
+
+// Versionsverlauf einer Notiz
+route('GET', '/api/sync/versions', async (req, ctx, q) => vaultOf(ctx.user.id).versions(q.get('path')));
+route('GET', '/api/sync/version', async (req, ctx, q) => ({ content: await vaultOf(ctx.user.id).version(q.get('path'), q.get('id')) }));
+
 route('PUT', '/api/sync/folder', async (req, ctx) => vaultOf(ctx.user.id).putFolder((await readJson(req)).path));
 route('DELETE', '/api/sync/folder', async (req, ctx, q) => vaultOf(ctx.user.id).remove(q.get('path'), { force: true }));
 

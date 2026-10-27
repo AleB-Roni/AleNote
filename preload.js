@@ -26,8 +26,12 @@ contextBridge.exposeInMainWorld('alenoteNative', {
   listPlugins: call('plugins:list'),
   openPluginFolder: call('plugins:openFolder'),
   saveTextFile: call('file:saveText'),
+  saveFile: call('file:save'),
+  printNote: call('export:pdf'),
   setTitleBar: call('window:titlebar'),
   openExternal: call('open:external'),
+  focusWindow: call('window:focus'),
+  fetchCalendar: call('ical:fetch'),
   // Konto & Synchronisierung
   getAccount: call('account:get'),
   probeServer: call('account:probe'),
@@ -36,6 +40,8 @@ contextBridge.exposeInMainWorld('alenoteNative', {
   accountInfo: call('account:me'),
   changePassword: call('account:password'),
   syncNow: call('sync:now'),
+  noteVersions: call('history:list'),
+  noteVersion: call('history:get'),
   syncStart: call('sync:start'),
   syncResolve: call('sync:resolve'),
   // Updates

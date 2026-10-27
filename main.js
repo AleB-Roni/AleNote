@@ -1,7 +1,7 @@
 // AleNote – Electron Hauptprozess
 // Verwaltet Fenster, Dateisystem (Vault), Assets, Einstellungen und Plugins.
 
-const { app, BrowserWindow, ipcMain, dialog, shell, protocol, net, globalShortcut, screen } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell, protocol, net, globalShortcut, screen, Tray, Menu, nativeImage } = require('electron');
 const path = require('path');
 const fs = require('fs/promises');
 const { pathToFileURL } = require('url');
@@ -68,7 +68,7 @@ async function readTree(dir) {
   const entries = await fs.readdir(dir, { withFileTypes: true });
   const out = [];
   for (const e of entries) {
-    if (e.name.startsWith('.') || e.name === ASSET_DIR || (dir === vault && e.name === TRASH_DIR)) continue;
+    if (e.name.startsWith('.') || e.name === ASSET_DIR || (dir === vault && (e.name === TRASH_DIR || e.name === '_config'))) continue;
     const abs = path.join(dir, e.name);
     if (e.isDirectory()) {
       out.push({ type: 'folder', name: e.name, path: toRel(abs), children: await readTree(abs) });
@@ -111,8 +111,13 @@ function createWindow() {
     }
   });
   win.removeMenu();
-  win.once('ready-to-show', () => win.show());
+  // Mit --hidden (Autostart) startet AleNote unsichtbar im Infobereich
+  win.once('ready-to-show', () => { if (process.argv.includes('--hidden') && settings.runInTray) setupTray(); else win.show(); });
   win.on('closed', () => { win = null; if (quickWin) quickWin.destroy(); });
+  // Im Hintergrund weiterlaufen (Erinnerungen & globale Schnellnotiz), statt zu beenden
+  win.on('close', (e) => {
+    if (settings.runInTray && !app.isQuitting) { e.preventDefault(); win.hide(); setupTray(); }
+  });
   win.loadURL('alenote://app/index.html');
 
   // Externe Links im Standardbrowser öffnen
@@ -126,6 +131,27 @@ function createWindow() {
   win.webContents.on('before-input-event', (e, input) => {
     if (input.type === 'keyDown' && input.key === 'F12') win.webContents.toggleDevTools();
   });
+}
+
+// ---------- Infobereich (Tray) & Autostart ----------
+let tray = null;
+function showMain() { if (!win) return; if (win.isMinimized()) win.restore(); win.show(); win.focus(); }
+function setupTray() {
+  if (tray) return;
+  const img = nativeImage.createFromPath(path.join(__dirname, 'assets', 'icon.png')).resize({ width: 16, height: 16 });
+  tray = new Tray(img);
+  tray.setToolTip('AleNote');
+  tray.setContextMenu(Menu.buildFromTemplate([
+    { label: 'AleNote öffnen', click: showMain },
+    { label: 'Schnellnotiz', click: () => showQuickWindow() },
+    { type: 'separator' },
+    { label: 'Beenden', click: () => { app.isQuitting = true; app.quit(); } }
+  ]));
+  tray.on('click', showMain);
+}
+function applyAutostart() {
+  if (process.platform !== 'win32' && process.platform !== 'darwin') return;
+  try { app.setLoginItemSettings({ openAtLogin: !!settings.autostart, args: ['--hidden'] }); } catch {}
 }
 
 // ---------- Schnellnotiz-Fenster (globale Tastenkombination) ----------
@@ -299,6 +325,11 @@ function registerAccountIpc() {
   ipcMain.handle('update:check', () => updater.check());
   ipcMain.handle('update:install', () => updater.install());
 
+  // Versionsverlauf (liegt auf dem Server)
+  const needAccount = () => { if (!settings.account) throw new Error('Der Versionsverlauf benötigt die Anmeldung an deinem AleNote-Server'); return settings.account; };
+  ipcMain.handle('history:list', (_e, p) => { const acc = needAccount(); return serverCall(acc.server, 'GET', '/api/sync/versions?path=' + encodeURIComponent(p), null, acc.token); });
+  ipcMain.handle('history:get', (_e, p, id) => { const acc = needAccount(); return serverCall(acc.server, 'GET', `/api/sync/version?path=${encodeURIComponent(p)}&id=${encodeURIComponent(id)}`, null, acc.token); });
+
   ipcMain.handle('sync:now', () => { sync.run(); return sync.status; });
   ipcMain.handle('sync:start', () => sync.start());
   ipcMain.handle('sync:resolve', (_e, p, choice) => sync.resolve(p, choice));
@@ -310,6 +341,8 @@ function registerIpc() {
     Object.assign(settings, patch);
     await saveSettings();
     if ('quicknote' in patch) registerQuickShortcut();
+    if ('autostart' in patch) applyAutostart();
+    if ('runInTray' in patch) { if (patch.runInTray) setupTray(); else if (tray) { tray.destroy(); tray = null; } }
     return settings;
   });
 
@@ -452,17 +485,53 @@ function registerIpc() {
     return r.filePath;
   });
 
+  // Binärdatei speichern (z.B. Word-Export)
+  handle('file:save', async (defaultName, bytes, filters) => {
+    const r = await dialog.showSaveDialog(win, { defaultPath: path.join(app.getPath('documents'), defaultName), filters: filters || [] });
+    if (r.canceled || !r.filePath) return null;
+    await fs.writeFile(r.filePath, Buffer.from(bytes));
+    return r.filePath;
+  });
+  // Aktuelle Seite als PDF (nutzt die Druck-Ansicht aus app.css)
+  handle('export:pdf', async (defaultName) => {
+    const r = await dialog.showSaveDialog(win, { defaultPath: path.join(app.getPath('documents'), defaultName), filters: [{ name: 'PDF', extensions: ['pdf'] }] });
+    if (r.canceled || !r.filePath) return null;
+    // Seitenränder zeigen sonst die (dunkle) Fensterfarbe
+    win.setBackgroundColor('#ffffff');
+    let pdf;
+    try { pdf = await win.webContents.printToPDF({ printBackground: true, pageSize: 'A4', margins: { marginType: 'custom', top: 0.6, bottom: 0.6, left: 0.6, right: 0.6 } }); }
+    finally { win.setBackgroundColor('#14141a'); }
+    await fs.writeFile(r.filePath, pdf);
+    shell.openPath(r.filePath);
+    return r.filePath;
+  });
+
   handle('window:titlebar', (color, symbolColor) => {
     try { win.setTitleBarOverlay({ color, symbolColor, height: 40 }); } catch {}
   });
   handle('open:external', (url) => { if (/^https?:/.test(url)) shell.openExternal(url); });
+  handle('window:focus', () => showMain());
+
+  // Kalender-Abo (iCal) laden – im Hauptprozess, damit Browser-Sicherheitsregeln (CORS) nicht stören
+  handle('ical:fetch', async (url) => {
+    const u = String(url || '').trim().replace(/^webcal:/i, 'https:');
+    if (!/^https?:\/\//i.test(u)) throw new Error('Bitte eine http(s)- oder webcal-Adresse angeben');
+    const res = await fetch(u, { signal: AbortSignal.timeout(20e3), headers: { 'User-Agent': 'AleNote' } });
+    if (!res.ok) throw new Error('Kalender antwortet mit ' + res.status);
+    const text = await res.text();
+    if (!text.includes('BEGIN:VCALENDAR')) throw new Error('Unter dieser Adresse liegt kein iCal-Kalender');
+    return text.slice(0, 15e6);
+  });
 }
 
 // ---------- Start ----------
 const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) app.quit();
 else {
-  app.on('second-instance', () => { if (win) { if (win.isMinimized()) win.restore(); win.focus(); } });
+  app.on('second-instance', () => showMain());
+  app.on('before-quit', () => { app.isQuitting = true; });
+  // Windows-Benachrichtigungen brauchen eine App-ID
+  if (process.platform === 'win32') app.setAppUserModelId('com.alenote.app');
   app.whenReady().then(async () => {
     await loadSettings();
     await ensureVault();
@@ -472,6 +541,7 @@ else {
     registerQuickIpc();
     createWindow();
     registerQuickShortcut();
+    if (settings.runInTray) setupTray();
   });
   app.on('will-quit', () => globalShortcut.unregisterAll());
   app.on('window-all-closed', () => app.quit());

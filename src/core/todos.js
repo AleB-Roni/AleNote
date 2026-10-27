@@ -35,7 +35,8 @@ export function dueState(due, done) {
 /** Alle To-do-Blöcke aller Notizen (auch in frei platzierten Blöcken) */
 export async function collectTodos(app) {
   await app.saveNow();
-  const notes = app.sidebar.allNotes();
+  const tplFolder = (app.settings.templateFolder || 'Vorlagen') + '/';
+  const notes = app.sidebar.allNotes().filter((n) => !n.path.startsWith(tplFolder));
   const out = [];
   await Promise.all(notes.map(async (n) => {
     let data;

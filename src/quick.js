@@ -6,6 +6,22 @@ import { registerBuiltinThemes, shiftHue } from './themes.js';
 import { FONTS, ACCENTS } from './ui/settings.js';
 import { quickNoteForm } from './ui/quicknote.js';
 import { QUICK_DEFAULTS } from './core/todos.js';
+import { startDictation } from './ai/dictate.js';
+import { PROVIDERS } from './ai/providers.js';
+
+/** Minimale „App“ für das Diktieren im Schnellnotiz-Fenster (nutzt die KI-Einstellungen) */
+function miniApp(settings) {
+  const cfg = { providers: {}, defaultProvider: 'anthropic', ...(settings.ai || {}) };
+  return {
+    settings,
+    openSettings: () => api.focusWindow?.(),
+    ai: {
+      cfg,
+      providerConfig(id = cfg.defaultProvider, model) { const p = cfg.providers[id] || {}; return { provider: id, apiKey: p.apiKey || '', model: model || p.model || PROVIDERS[id]?.defaultModel, baseUrl: p.baseUrl || '' }; },
+      isConfigured(id = cfg.defaultProvider) { const p = PROVIDERS[id]; return !!p && (p.noKey || p.optionalKey || !!cfg.providers[id]?.apiKey); }
+    }
+  };
+}
 
 const host = document.getElementById('quick');
 const themes = new Map();
@@ -33,6 +49,7 @@ async function render() {
     notes,
     qs: { ...QUICK_DEFAULTS, ...(settings.quicknote || {}) },
     onCancel: () => api.quickHide(),
+    dictate: (onText) => startDictation(miniApp(settings), { onText }),
     onSubmit: async (entry) => {
       await api.quickSubmit(entry);
       host.replaceChildren(h('div.qn-done', {}, h('div.qn-done-icon', { text: '✓' }), h('div', { text: 'Gespeichert' })));

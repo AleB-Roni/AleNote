@@ -10,6 +10,14 @@ const { JsonFile, KeyedLock } = require('./store');
 const { httpError } = require('./auth');
 
 const locks = new KeyedLock();
+
+/** Gleicher Notizinhalt, abgesehen von Zeitstempeln? */
+function sameContent(a, b) {
+  try {
+    const norm = (x) => { const o = JSON.parse(x.toString('utf8')); delete o.updated; delete o.created; return JSON.stringify(o); };
+    return norm(a) === norm(b);
+  } catch { return a.equals(b); }
+}
 const hashOf = (buf) => crypto.createHash('sha1').update(buf).digest('hex');
 
 function checkPath(p, kind) {
@@ -35,6 +43,67 @@ class Vault {
   }
 
   lock(fn) { return locks.run(this.userId, fn); }
+
+  // ---------- Versionsverlauf ----------
+  // Vor jedem Überschreiben/Löschen einer Notiz wird der alte Inhalt aufbewahrt:
+  // history/<sha1(Pfad)>/<Zeit>_<rev>.alenote  – ausgedünnt (siehe pruneVersions)
+  historyDir(p) { return path.join(this.dir, 'history', hashOf(Buffer.from(p, 'utf8'))); }
+
+  async keepVersion(p, cur, incoming = null) {
+    if (!cur || cur.deleted || cur.kind !== 'note') return;
+    try {
+      const buf = await fs.readFile(this.fileFor('note', p));
+      const dir = this.historyDir(p);
+      await fs.mkdir(dir, { recursive: true });
+      // Nur echte Inhaltsänderungen aufbewahren (nicht bloß ein neuer Zeitstempel)
+      const latest = (await fs.readdir(dir)).filter((f) => /^\d+_\d+\.alenote$/.test(f)).sort((a, b) => Number(b.split('_')[0]) - Number(a.split('_')[0]))[0];
+      if (latest && sameContent(await fs.readFile(path.join(dir, latest)), buf)) return;
+      // Gleicher Inhalt wie die aktuelle Fassung → überspringen
+      if (incoming && sameContent(incoming, buf)) return;
+      await fs.writeFile(path.join(dir, `${cur.updated || Date.now()}_${cur.rev}.alenote`), buf);
+      await this.pruneVersions(dir);
+    } catch { /* Verlauf ist optional – Speichern darf daran nicht scheitern */ }
+  }
+
+  /**
+   * Ausdünnen: letzte Stunde alle, bis 24 Std. je 10 Min. eine Version, bis 7 Tage je Stunde, bis 90 Tage je Tag,
+   * ältere werden gelöscht. Behalten wird jeweils die neueste im Zeitfenster.
+   */
+  async pruneVersions(dir) {
+    const now = Date.now();
+    const files = (await fs.readdir(dir)).filter((f) => /^\d+_\d+\.alenote$/.test(f))
+      .map((f) => ({ f, t: Number(f.split('_')[0]) })).sort((a, b) => b.t - a.t);
+    const seen = new Set();
+    for (const { f, t } of files) {
+      const age = now - t;
+      const bucket = age < 36e5 ? 'a' + t : age < 864e5 ? 'm' + Math.floor(t / 6e5) : age < 7 * 864e5 ? 'h' + Math.floor(t / 36e5) : age < 90 * 864e5 ? 'd' + Math.floor(t / 864e5) : null;
+      if (!bucket || seen.has(bucket) || seen.size >= 300) await fs.rm(path.join(dir, f), { force: true });
+      else seen.add(bucket);
+    }
+  }
+
+  async versions(p) {
+    checkPath(p, 'note');
+    const dir = this.historyDir(p);
+    let files = [];
+    try { files = await fs.readdir(dir); } catch {}
+    const out = [];
+    for (const f of files) {
+      const m = f.match(/^(\d+)_(\d+)\.alenote$/);
+      if (!m) continue;
+      const st = await fs.stat(path.join(dir, f)).catch(() => null);
+      out.push({ id: f.replace(/\.alenote$/, ''), updated: Number(m[1]), rev: Number(m[2]), size: st?.size || 0 });
+    }
+    const idx = await this.index.load();
+    return { current: idx.items[p] ? { path: p, ...idx.items[p] } : null, versions: out.sort((a, b) => b.updated - a.updated) };
+  }
+
+  async version(p, id) {
+    checkPath(p, 'note');
+    if (!/^\d+_\d+$/.test(String(id))) throw httpError(400, 'Ungültige Version');
+    try { return (await fs.readFile(path.join(this.historyDir(p), id + '.alenote'))).toString('utf8'); }
+    catch { throw httpError(404, 'Version nicht gefunden'); }
+  }
 
   async changes(since = 0) {
     const idx = await this.index.load();
@@ -86,6 +155,7 @@ class Vault {
         if (bytes - (cur && !cur.deleted ? cur.size || 0 : 0) + buf.length > quotaBytes) throw httpError(413, 'Speicherplatz-Kontingent überschritten');
       }
       const file = this.fileFor(kind, p);
+      if (kind === 'note') await this.keepVersion(p, cur, buf);
       await fs.mkdir(path.dirname(file), { recursive: true });
       await fs.writeFile(file + '.tmp', buf);
       await fs.rename(file + '.tmp', file);
@@ -120,6 +190,7 @@ class Vault {
         e.extra = { current: { path: p, ...cur } };
         throw e;
       }
+      if (cur.kind === 'note') await this.keepVersion(p, cur);
       if (cur.kind !== 'folder') await fs.rm(this.fileFor(cur.kind, p), { force: true });
       idx.seq++;
       idx.items[p] = { ...cur, rev: cur.rev + 1, seq: idx.seq, updated: Date.now(), deleted: true, size: 0, hash: '' };

@@ -69,6 +69,9 @@ export class AIManager {
 
     reg.registerCommand({ id: 'ai:bar', name: 'KI-Befehl …', icon: 'zap', shortcut: 'Ctrl+J', group: 'KI', when: hasNote, run: () => this.openCommandBar() });
     reg.registerCommand({ id: 'ai:chat', name: 'KI-Chat ein-/ausblenden', icon: 'sparkles', shortcut: 'Ctrl+Shift+J', group: 'KI', run: () => this.chat.toggle() });
+    reg.registerCommand({ id: 'ai:dictate', name: 'Diktieren (Sprache → Text)', icon: 'mic', shortcut: 'Ctrl+Shift+M', group: 'KI', run: () => this.dictateIntoNote() });
+    reg.registerSlashCommand({ id: 'ai:dictate', name: 'Diktieren', icon: 'mic', group: 'KI', description: 'Sprechen statt tippen', keywords: ['diktieren', 'sprache', 'mikrofon', 'voice', 'sprechen'], run: () => this.dictateIntoNote() });
+    reg.registerCommand({ id: 'ai:askNotes', name: 'Frag deine Notizen (KI durchsucht alle Notizen)', icon: 'layers', shortcut: 'Ctrl+Shift+A', group: 'KI', run: () => this.chat.askNotes() });
     reg.registerSlashCommand({
       id: 'ai:bar', name: 'KI fragen …', icon: 'sparkles', group: 'KI', description: 'Eigene Anweisung an die KI', keywords: ['ki', 'ai', 'claude', 'chatgpt', 'gemini'],
       run: (editor, { blockId }) => this.openCommandBar({ blockId, fromSlash: true })
@@ -318,6 +321,28 @@ export class AIManager {
       '-',
       ...this.cfg.actions.filter((a) => a.scope !== 'page').map((a) => ({ label: `${a.icon || ''} ${a.name}`.trim(), run: () => this.run(a, { target }) }))
     ];
+  }
+
+  /** Diktieren an der Cursorposition der Notiz (oder als neuer Absatz) */
+  async dictateIntoNote() {
+    const editor = this.app.editor;
+    if (!editor.note) { this.app.quickNote(); setTimeout(() => document.querySelector('.qn-mic')?.click(), 300); return; }
+    const sel = window.getSelection();
+    const range = sel.rangeCount && editor.page?.contains(sel.anchorNode) ? sel.getRangeAt(0).cloneRange() : null;
+    const { startDictation } = await import('./dictate.js');
+    startDictation(this.app, {
+      onText: (t) => {
+        if (range) {
+          const s = window.getSelection(); s.removeAllRanges(); s.addRange(range);
+          const host = (range.startContainer.nodeType === 1 ? range.startContainer : range.startContainer.parentElement)?.closest('[contenteditable]');
+          host?.focus();
+          // Leerzeichen vor dem diktierten Text, wenn direkt davor ein Zeichen steht
+          const before = range.startContainer.nodeType === 3 ? range.startContainer.textContent.slice(0, range.startOffset) : (host?.textContent || '');
+          if (before && !/\s$/.test(before)) t = ' ' + t;
+        }
+        editor.insertText(t);
+      }
+    });
   }
 
   /** Einträge für die Formatierungsleiste (markierter Text) */

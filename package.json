@@ -1,7 +1,7 @@
 {
   "name": "alenote",
   "productName": "AleNote",
-  "version": "1.7.0",
+  "version": "1.8.0",
   "description": "AleNote – moderne, erweiterbare Notiz-App im Stil von Obsidian/Notion",
   "main": "main.js",
   "author": "AleNote",
@@ -19,6 +19,7 @@
     "@capacitor/cli": "^8.5.3",
     "@capacitor/core": "^8.5.3",
     "@capacitor/filesystem": "^8.1.5",
+    "@capacitor/local-notifications": "8.3.1",
     "@capacitor/status-bar": "^8.0.4",
     "electron": "^45.0.0",
     "electron-builder": "^26.0.0"

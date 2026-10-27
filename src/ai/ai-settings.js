@@ -4,6 +4,7 @@ import { icon } from '../ui/icons.js';
 import { toast, confirmDialog } from '../ui/overlays.js';
 import { PROVIDERS, streamChat } from './providers.js';
 import { DEFAULT_ACTIONS, SCOPE_LABELS, OUTPUT_LABELS } from './ai.js';
+import { dictateSettings, dictationMethod } from './dictate.js';
 
 export function renderAISettings(app, page, rerender, { shortcutRecorder, toggle, select }) {
   const ai = app.ai;
@@ -50,6 +51,18 @@ export function renderAISettings(app, page, rerender, { shortcutRecorder, toggle
     grid.append(card);
   }
   page.append(grid);
+
+  // ---------- Diktieren ----------
+  const ds = dictateSettings(app);
+  const setD = (patch) => { cfg.dictate = { ...ds, ...patch }; ai.save(); };
+  const method = dictationMethod(app);
+  page.append(section('Diktieren', 'Sprechen statt tippen: Mikrofon-Knopf in der Schnellnotiz, „/diktieren“ oder <kbd>Strg</kbd><kbd>Shift</kbd><kbd>M</kbd>. Die Aufnahme wird von OpenAI, Groq oder Gemini in Text umgewandelt (Schlüssel oben hinterlegen).'));
+  page.append(h('div.set-row', {}, h('div.set-label', {}, h('div', { text: 'Spracherkennung' }), h('div.muted.small', { text: method ? (method.kind === 'browser' ? 'Aktiv: Spracherkennung des Browsers' : 'Aktiv: ' + PROVIDERS[method.provider].name) : 'Noch nicht eingerichtet – Schlüssel für OpenAI, Groq oder Gemini hinterlegen' })),
+    h('div.set-control', {}, select([['auto', 'Automatisch'], ['openai', 'OpenAI (Whisper)'], ['groq', 'Groq (Whisper, sehr schnell)'], ['gemini', 'Gemini'], ['browser', 'Browser (Chrome/Edge/Safari)']], ds.provider, (v) => { setD({ provider: v }); rerender(); }))));
+  page.append(h('div.set-row', {}, h('div.set-label', {}, h('div', { text: 'Sprache' })),
+    h('div.set-control', {}, select([['de', 'Deutsch'], ['en', 'Englisch'], ['fr', 'Französisch'], ['it', 'Italienisch'], ['es', 'Spanisch'], ['auto', 'Automatisch erkennen']], ds.language, (v) => setD({ language: v })))));
+  page.append(h('div.set-row', {}, h('div.set-label', {}, h('div', { text: 'Text mit KI bereinigen' }), h('div.muted.small', { text: 'Satzzeichen, Füllwörter („äh“) und Erkennungsfehler korrigiert der Standard-Anbieter' })),
+    h('div.set-control', {}, toggle(ds.cleanup, (v) => setD({ cleanup: v })))));
 
   // ---------- Eigene Prompts ----------
   page.append(section('Eigene Prompts', 'Lege fest, was die KI mit dem Text machen soll. Prompts erscheinen in der KI-Leiste (<kbd>Strg</kbd><kbd>J</kbd>), im „/“-Menü, in der Befehlspalette, im Block-Menü (⋮⋮) und bei markiertem Text in der Formatierungsleiste.'));

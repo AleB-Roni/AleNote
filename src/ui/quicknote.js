@@ -6,6 +6,7 @@ import { icon } from './icons.js';
 import { modal, prompt, toast } from './overlays.js';
 import { datePicker } from './datepicker.js';
 import { addQuickNote, quickSettings, dueLabel } from '../core/todos.js';
+import { startDictation } from '../ai/dictate.js';
 
 /**
  * Baut das Formular.
@@ -14,7 +15,7 @@ import { addQuickNote, quickSettings, dueLabel } from '../core/todos.js';
  * preset:   { due, asTodo, text } – z.B. vom Kalender
  * onSubmit: async (entry) => void
  */
-export function quickNoteForm({ notes, qs, preset = {}, onSubmit, onCancel }) {
+export function quickNoteForm({ notes, qs, preset = {}, onSubmit, onCancel, dictate }) {
   const state = { target: qs.target, asTodo: preset.asTodo ?? (!!preset.due || qs.asTodo), due: preset.due || '', dueTime: preset.dueTime || '' };
   const clock = h('span.qn-clock');
   const tick = () => { clock.textContent = formatDate(new Date(), 'dddd, DD.MM.YYYY · HH:mm'); };
@@ -58,6 +59,16 @@ export function quickNoteForm({ notes, qs, preset = {}, onSubmit, onCancel }) {
     onPick: (d, t) => { state.due = d; state.dueTime = t; if (d) state.asTodo = true; renderOpts(); text.focus(); }
   }));
 
+  // Diktieren: Text an der Cursorposition einfügen
+  const micBtn = dictate ? h('button.pill.qn-mic', { title: 'Diktieren (Sprache → Text)', onclick: () => dictate((t) => {
+    const a = text.selectionStart ?? text.value.length, b = text.selectionEnd ?? a;
+    const before = text.value.slice(0, a), after = text.value.slice(b);
+    const ins = (before && !/\s$/.test(before) ? ' ' : '') + t;
+    text.value = before + ins + after;
+    text.focus();
+    text.setSelectionRange((before + ins).length, (before + ins).length);
+  }) }, icon('mic', 14), h('span', { text: 'Diktieren' })) : null;
+
   const save = h('button.btn.btn-primary.qn-save', {}, icon('check', 15), 'Speichern');
   const submit = async () => {
     if (!text.value.trim()) { text.focus(); text.classList.add('shake'); setTimeout(() => text.classList.remove('shake'), 400); return; }
@@ -74,7 +85,7 @@ export function quickNoteForm({ notes, qs, preset = {}, onSubmit, onCancel }) {
   const el = h('div.quicknote', {},
     h('div.qn-head', {}, h('span.qn-logo', {}, icon('zap', 15)), h('b', { text: 'Schnellnotiz' }), h('div.flex'), clock),
     text,
-    h('div.qn-opts', {}, h('label.qn-where', {}, icon('file', 14), target), todoBtn, dueBtn),
+    h('div.qn-opts', {}, h('label.qn-where', {}, icon('file', 14), target), todoBtn, dueBtn, micBtn),
     h('div.qn-foot', {}, h('span.muted.small', { html: '<kbd>Enter</kbd> speichern · <kbd>Shift</kbd><kbd>Enter</kbd> neue Zeile · <kbd>Esc</kbd> schließen' }), h('div.flex'), save));
   el.focusText = () => { text.focus(); text.setSelectionRange(text.value.length, text.value.length); };
   return el;
@@ -86,6 +97,7 @@ export function openQuickNote(app, preset = {}) {
   let m;
   const form = quickNoteForm({
     notes: app.sidebar.allNotes(), qs: quickSettings(app), preset,
+    dictate: (onText) => startDictation(app, { onText }),
     onCancel: () => m.close(),
     onSubmit: async (entry) => {
       const path = await addQuickNote(app, entry);

@@ -101,6 +101,13 @@ Die portable EXE kann sich nicht selbst aktualisieren.
 - **Schnellnotiz** (⚡ in der Seitenleiste, Strg+Shift+Space in AleNote, **Strg+Alt+Space überall in Windows**): kleines Fenster, Text eintippen, Enter. Der Eintrag landet mit Datum und Uhrzeit in „Quicknotizen“ oder einer frei wählbaren Notiz, auf Wunsch als To-do mit Fälligkeitsdatum. Einstellungen → Schnellnotiz.
 - **Fälligkeitsdatum für To-dos**: im To-do auf 📅 klicken, `/To-do mit Datum` oder Strg+Shift+T. Heute, Morgen oder Überfällig werden farbig markiert.
 - **Kalender** (Seitenleiste oder Strg+Alt+K): Monats- und Listenansicht mit allen To-dos des angemeldeten Benutzers. Abhaken, per Ziehen auf einen anderen Tag verschieben, Doppelklick auf einen Tag legt eine Aufgabe an, Klick öffnet die Notiz.
+- **Vorlagen**: Notizen im Ordner „Vorlagen“ (Besprechung, Projekt, Wochenplan, Tagesnotiz sind dabei). „Neue Notiz aus Vorlage“ (Strg+Alt+V), `/vorlage` fügt eine Vorlage ein, „Als Vorlage speichern“ im Notiz-Menü. Platzhalter wie `{datum}`, `{wochentag}`, `{kw}` werden ersetzt, auch im Namen.
+- **Versionsverlauf** (Strg+Alt+H oder Notiz-Menü): Der Server bewahrt frühere Stände jeder Notiz auf (letzte Stunde alle, dann je 10 Min., Stunde, Tag – 90 Tage). Vorschau, Änderungen farbig vergleichen, wiederherstellen oder als Kopie anlegen.
+- **Export & Import**: Notiz als **PDF** oder **Word (.docx)** mit Tabellen, Bildern und Formatierung (Notiz-Menü oder Strg+P). Import von Markdown-Dateien, ganzen **Obsidian**-Vaults und **Notion**-Exporten (ZIP, inkl. CSV-Tabellen und Bildern).
+- **Frag deine Notizen** (Strg+Shift+A): Im KI-Chat „Alle Notizen“ wählen – AleNote sucht die passenden Notizen, die KI antwortet daraus und nennt die Quellen als klickbare Links.
+- **Kalender**: Monat, Woche und Liste. **Kalender-Abos** (Google, Outlook, iCloud per iCal-Link) zeigen Termine farbig an, inkl. Wiederholungen. Tagesnotiz für jeden Tag direkt aus dem Kalender. Die Abos werden mit dem Konto auf alle Geräte synchronisiert.
+- **Erinnerungen** an fällige To-dos: Benachrichtigung zur Uhrzeit (oder zur Standardzeit), Karte mit „Erledigt“ und „Später“, Tagesübersicht beim Start. Auf Android auch bei geschlossener App. Unter Windows optional im Infobereich weiterlaufen und mit Windows starten (Einstellungen → Erinnerungen).
+- **Diktieren** (Mikrofon in der Schnellnotiz, `/diktieren`, Strg+Shift+M): Sprache wird per OpenAI/Groq (Whisper) oder Gemini zu Text, die KI bereinigt Satzzeichen und Füllwörter. Im Browser geht ersatzweise die eingebaute Spracherkennung.
 - **Papierkorb** (🗑 unten in der Seitenleiste oder Befehl „Papierkorb öffnen“): Gelöschte Notizen und Ordner bleiben 30 Tage erhalten und lassen sich an ihren alten Platz zurücklegen. Direkt nach dem Löschen geht auch „Rückgängig“. Der Papierkorb wird mitsynchronisiert, Wiederherstellen klappt also auch auf einem anderen Gerät. Er liegt im Vault im Ordner `_trash`.
 - **Mitgelieferte Plugins**: Wortzähler, Markdown-Export, Tagesnotiz (Strg+Alt+N), Gliederung, Fortschrittsbalken
 
@@ -158,6 +165,10 @@ Voreingestellt sind: `Strg+Shift+D` Datum · `Strg+Shift+U` Uhrzeit · `Strg+Alt
 | Strg+Shift+Space | Schnellnotiz (global: Strg+Alt+Space) |
 | Strg+Alt+K | Kalender |
 | Strg+Shift+T | Fälligkeitsdatum festlegen |
+| Strg+Alt+V | Neue Notiz aus Vorlage |
+| Strg+Alt+H | Versionsverlauf |
+| Strg+Shift+A | Frag deine Notizen |
+| Strg+Shift+M | Diktieren |
 | F12 | Entwicklerwerkzeuge |
 
 ## Projektstruktur

@@ -75,7 +75,9 @@ export async function createMobileApi({ web = false } = {}) {
       Filesystem: core.registerPlugin('Filesystem'),
       App: core.registerPlugin('App'),
       StatusBar: core.registerPlugin('StatusBar'),
-      ApkInstaller: core.registerPlugin('ApkInstaller')
+      ApkInstaller: core.registerPlugin('ApkInstaller'),
+      AleTools: core.registerPlugin('AleTools'),
+      LocalNotifications: core.registerPlugin('LocalNotifications')
     };
     fs = new CapacitorFs(Plugins.Filesystem, core.Capacitor);
   } else if (web) {
@@ -119,7 +121,7 @@ export async function createMobileApi({ web = false } = {}) {
   async function readTree(dir) {
     const out = [];
     for (const e of await vault.list(dir)) {
-      if (e.name.startsWith('.') || e.name === '_assets' || e.name.endsWith('.tmp') || (!dir && e.name === '_trash')) continue;
+      if (e.name.startsWith('.') || e.name === '_assets' || e.name.endsWith('.tmp') || (!dir && (e.name === '_trash' || e.name === '_config'))) continue;
       const p = join(dir, e.name);
       if (e.type === 'directory') out.push({ type: 'folder', name: e.name, path: p, children: await readTree(p) });
       else if (e.name.endsWith(NOTE_EXT)) {
@@ -345,6 +347,17 @@ export async function createMobileApi({ web = false } = {}) {
       a.click();
       return name;
     },
+    saveFile: async (name, bytes, filters, mime = 'application/octet-stream') => {
+      if (native) { await Plugins.AleTools.shareFile({ name, data: bytesToBase64(bytes), mime }); return name; }
+      const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(new Blob([bytes], { type: mime })), download: name });
+      a.click();
+      return name;
+    },
+    printNote: async (name) => {
+      if (native) { await Plugins.AleTools.print({ name }); return null; }
+      window.print();
+      return null;
+    },
     setTitleBar: async () => {
       if (!native) return;
       const bg = getComputedStyle(document.documentElement).getPropertyValue('--bg-2').trim() || '#17171c';
@@ -353,6 +366,16 @@ export async function createMobileApi({ web = false } = {}) {
       Plugins.StatusBar.setStyle({ style: dark ? 'DARK' : 'LIGHT' }).catch(() => {});
     },
     openExternal: async (url) => { window.open(url, '_blank'); },
+    fetchCalendar: async (url) => {
+      const acc = settings.account;
+      if (acc) return (await serverCall(acc.server, 'GET', '/api/ical?url=' + encodeURIComponent(url), null, acc.token)).text;
+      try {
+        const res = await fetch(String(url).replace(/^webcal:/i, 'https:'), { signal: AbortSignal.timeout(20e3) });
+        const text = await res.text();
+        if (!text.includes('BEGIN:VCALENDAR')) throw new Error('Kein iCal-Kalender');
+        return text;
+      } catch { throw new Error('Kalender-Abos brauchen die Anmeldung an deinem AleNote-Server'); }
+    },
 
     // Konto & Synchronisierung
     getAccount: async () => ({ account: publicAccount(), vault: vaultPath(), status: sync.status }),
@@ -391,6 +414,15 @@ export async function createMobileApi({ web = false } = {}) {
     },
     changePassword: async (oldPassword, newPassword) => serverCall(settings.account.server, 'POST', '/api/me/password', { oldPassword, newPassword }, settings.account.token),
     syncNow: async () => { sync.run(); return sync.status; },
+    noteVersions: async (p) => {
+      const acc = settings.account;
+      if (!acc) throw new Error('Der Versionsverlauf benötigt die Anmeldung an deinem AleNote-Server');
+      return serverCall(acc.server, 'GET', '/api/sync/versions?path=' + encodeURIComponent(p), null, acc.token);
+    },
+    noteVersion: async (p, id) => {
+      const acc = settings.account;
+      return serverCall(acc.server, 'GET', `/api/sync/version?path=${encodeURIComponent(p)}&id=${encodeURIComponent(id)}`, null, acc.token);
+    },
     syncStart: async () => sync.start(),
     syncResolve: (p, choice) => sync.resolve(p, choice),
 

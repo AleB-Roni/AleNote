@@ -33,7 +33,7 @@ function createBrowserFallback() {
     chooseVault: () => ok(null),
     revealInExplorer: () => ok(),
     openFolder: () => ok(),
-    tree: (opts) => ok(opts?.trash ? tree('_trash') : tree('').filter((n) => n.path !== '_trash')),
+    tree: (opts) => ok(opts?.trash ? tree('_trash') : tree('').filter((n) => n.path !== '_trash' && n.path !== '_config')),
     ensureFolder: (p) => { const parts = (p || '').split('/').filter(Boolean); parts.forEach((_, i) => { const f = parts.slice(0, i + 1).join('/'); if (!db.folders.includes(f)) db.folders.push(f); }); save(); return ok(p); },
     readNote: (p) => ok(structuredClone(db.files[p])),
     writeNote: (p, d) => { db.files[p] = structuredClone(d); save(); return ok(true); },
@@ -69,8 +69,14 @@ function createBrowserFallback() {
       const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(new Blob([content])), download: name });
       a.click(); return ok(name);
     },
+    saveFile: (name, bytes, filters, mime = 'application/octet-stream') => {
+      const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(new Blob([bytes], { type: mime })), download: name });
+      a.click(); return ok(name);
+    },
+    printNote: () => { window.print(); return ok(null); },
     setTitleBar: () => ok(),
     openExternal: (url) => { window.open(url, '_blank'); return ok(); },
+    fetchCalendar: async (url) => (await fetch(String(url).replace(/^webcal:/i, 'https:'))).text(),
     // Konto & Sync gibt es nur in der Desktop-App
     getAccount: () => ok({ account: null, status: { state: 'off' } }),
     probeServer: () => Promise.reject(new Error('Nur in der Desktop-App verfügbar')),

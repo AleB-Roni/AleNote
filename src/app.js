@@ -25,6 +25,10 @@ import { datePicker } from './ui/datepicker.js';
 import { addQuickNote, dueLabel } from './core/todos.js';
 import { moveToTrash, listTrash, restoreFromTrash, purgeExpired } from './core/trash.js';
 import { openTrash } from './ui/trash.js';
+import { openTemplatePicker, saveCurrentAsTemplate } from './ui/templates.js';
+import { openHistory } from './ui/history.js';
+import { exportPdf, exportDocx, openImport } from './ui/export.js';
+import { ReminderService } from './core/reminders.js';
 import { initMobile, isNarrow } from './core/mobile.js';
 
 class App {
@@ -74,6 +78,7 @@ class App {
 
     let tree = [];
     await safe('Notizen laden', async () => { tree = await this.sidebar.refresh(); });
+    this.reminders = new ReminderService(this);
     if (!tree.length && !this.settings.welcomed) {
       const p = await api.createNote('', 'Willkommen bei AleNote', welcomeNote());
       await this.saveSettings({ welcomed: true });
@@ -101,6 +106,7 @@ class App {
     this.events.on('todos:change', () => this.sidebar.updateBadge());
     this.events.on('note:save', (data) => { if ((data.blocks || []).some((b) => b.type === 'todo' && b.data?.due)) this.sidebar.updateBadge(); });
     document.body.classList.add('ready');
+    safe('Erinnerungen', () => this.reminders.start());
     // Papierkorb: Einträge älter als 30 Tage entfernen
     setTimeout(() => purgeExpired(api).then((n) => { if (n) this.sidebar.updateTrashBadge?.(); }).catch((err) => console.error(err)), 4000);
     if (this.startErrors.length) toast('Beim Start ist ein Fehler aufgetreten – ' + this.startErrors.join(' · '), { type: 'error', duration: 12000 });
@@ -153,6 +159,7 @@ class App {
       h('p.muted', { text: 'Wähle links eine Notiz oder lege eine neue an.' }),
       h('div.empty-actions', {},
         h('button.btn.btn-primary', { onclick: () => this.createNote('') }, icon('filePlus', 16), 'Neue Notiz'),
+        h('button.btn', { onclick: () => openTemplatePicker(this, { mode: 'new' }) }, icon('layers', 16), 'Aus Vorlage'),
         h('button.btn', { onclick: () => this.palette.open() }, icon('search', 16), 'Suchen')),
       h('div.empty-hints', { html: '<span><kbd>Strg</kbd><kbd>N</kbd> Neue Notiz</span><span><kbd>Strg</kbd><kbd>P</kbd> Suchen & Befehle</span><span><kbd>/</kbd> Blöcke einfügen</span>' })));
   }
@@ -544,6 +551,13 @@ class App {
     r.registerCommand({ id: 'core.quickNote', name: 'Schnellnotiz', icon: 'zap', shortcut: 'Ctrl+Shift+Space', group: 'Notizen', run: () => this.quickNote() });
     r.registerCommand({ id: 'core.calendar', name: 'Kalender öffnen', icon: 'calendar', shortcut: 'Ctrl+Alt+K', group: 'Navigation', run: () => this.openCalendar() });
     r.registerCommand({ id: 'core.todoDue', name: 'Fälligkeitsdatum festlegen', icon: 'calendar', shortcut: 'Ctrl+Shift+T', group: 'Bearbeiten', when: hasNote, run: () => this.setDueForFocused() });
+    r.registerCommand({ id: 'core.exportPdf', name: 'Als PDF exportieren', icon: 'download', group: 'Export', when: hasNote, noteMenu: true, run: () => exportPdf(this) });
+    r.registerCommand({ id: 'core.exportDocx', name: 'Als Word-Datei exportieren', icon: 'download', group: 'Export', when: hasNote, noteMenu: true, run: () => exportDocx(this) });
+    r.registerCommand({ id: 'core.import', name: 'Importieren (Markdown, Obsidian, Notion)', icon: 'upload', group: 'Notizen', run: () => openImport(this, this.sidebar.contextFolder()) });
+    r.registerCommand({ id: 'core.history', name: 'Versionsverlauf', icon: 'clock', shortcut: 'Ctrl+Alt+H', group: 'Notizen', when: hasNote, noteMenu: true, run: () => openHistory(this) });
+    r.registerCommand({ id: 'core.newFromTemplate', name: 'Neue Notiz aus Vorlage', icon: 'layers', shortcut: 'Ctrl+Alt+V', group: 'Notizen', run: () => openTemplatePicker(this, { mode: 'new' }) });
+    r.registerCommand({ id: 'core.insertTemplate', name: 'Vorlage einfügen', icon: 'layers', group: 'Einfügen', when: hasNote, run: () => openTemplatePicker(this, { mode: 'insert' }) });
+    r.registerCommand({ id: 'core.saveAsTemplate', name: 'Als Vorlage speichern', icon: 'layers', group: 'Notizen', when: hasNote, noteMenu: true, run: () => saveCurrentAsTemplate(this) });
     r.registerCommand({ id: 'core.trash', name: 'Papierkorb öffnen', icon: 'trash', group: 'Notizen', run: () => this.openTrash() });
     r.registerCommand({ id: 'core.vault', name: 'Vault wechseln', icon: 'vault', group: 'Allgemein', run: () => this.chooseVault() });
     for (let i = 1; i <= 3; i++) {
@@ -571,6 +585,10 @@ class App {
   }
 
   registerCoreSlashCommands() {
+    this.registry.registerSlashCommand({
+      id: 'core.template', name: 'Vorlage einfügen', icon: 'layers', group: 'Einfügen', description: 'Inhalt einer Vorlage hier einfügen', keywords: ['vorlage', 'template', 'muster'],
+      run: (editor, { blockId }) => openTemplatePicker(this, { mode: 'insert', afterId: blockId })
+    });
     this.registry.registerSlashCommand({
       id: 'core.todoDue', name: 'To-do mit Datum', icon: 'calendar', group: 'Listen', description: 'Aufgabe mit Fälligkeitsdatum (erscheint im Kalender)', keywords: ['datum', 'fällig', 'termin', 'deadline', 'kalender', 'todo', 'aufgabe', 'due'],
       run: (editor, { blockId }) => { editor.focusBlock(blockId, 'end'); setTimeout(() => this.setDueForFocused(), 30); }
