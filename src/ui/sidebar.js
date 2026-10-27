@@ -7,6 +7,7 @@ import { shortcutText } from '../core/shortcuts.js';
 import { listTrash } from '../core/trash.js';
 import { openTemplatePicker } from './templates.js';
 import { openImport } from './export.js';
+import { pageTree, childFolder } from '../core/pages.js';
 
 export class Sidebar {
   constructor(app, el) {
@@ -113,7 +114,7 @@ export class Sidebar {
   }
 
   async refresh() {
-    try { this.tree = await this.app.api.tree(); } catch (err) { console.error(err); this.tree = []; }
+    try { this.tree = pageTree(await this.app.api.tree()); } catch (err) { console.error(err); this.tree = []; }
     if (!this.app.account?.account) this.app.api.getVault().then((v) => { this.vaultName.textContent = String(v).split(/[\\/]/).pop(); if (this.vaultName.parentElement) this.vaultName.parentElement.title = 'Vault: ' + v; });
     this.app.account?.renderSidebarButton();
     this.renderTree();
@@ -149,7 +150,7 @@ export class Sidebar {
 
   allNotes() {
     const list = [];
-    const walk = (nodes) => nodes.forEach((n) => (n.type === 'note' ? list.push(n) : walk(n.children)));
+    const walk = (nodes) => nodes.forEach((n) => { if (n.type === 'note') list.push(n); if (n.children) walk(n.children); });
     walk(this.tree);
     return list;
   }
@@ -189,7 +190,11 @@ export class Sidebar {
       if (n.type === 'folder') {
         const kids = this.filtered(n.children);
         if (kids.length || n.name.toLowerCase().includes(this.filter)) out.push({ ...n, children: kids.length ? kids : n.children, forceOpen: true });
-      } else if (n.name.toLowerCase().includes(this.filter)) out.push(n);
+      } else {
+        const kids = n.children ? this.filtered(n.children) : [];
+        if (kids.length) out.push({ ...n, children: kids, forceOpen: true });
+        else if (n.name.toLowerCase().includes(this.filter)) out.push(n);
+      }
     }
     return out;
   }
@@ -231,16 +236,38 @@ export class Sidebar {
 
   noteItem(n, depth, isFav = false) {
     const active = n.path === this.app.currentPath;
-    const row = h('div.tree-item.note' + (active ? '.active' : ''), { draggable: !isFav, dataset: { path: n.path }, style: { '--depth': depth } },
-      h('span.tree-chevron.empty'),
-      n.icon ? h('span.tree-emoji', { text: n.icon }) : icon('file', 15, 'tree-icon'),
+    const kids = !isFav && n.children?.length ? n.children : null;
+    const open = !!kids && (n.forceOpen || this.expanded.has(n.path));
+    const chevron = h('span.tree-chevron' + (kids ? '' : '.empty'), {}, kids ? icon('chevronRight', 13) : null);
+    const row = h('div.tree-item.note' + (active ? '.active' : '') + (open ? '.open' : '') + (kids ? '.has-kids' : ''), { draggable: !isFav, dataset: { path: n.path }, style: { '--depth': depth } },
+      chevron,
+      n.icon ? h('span.tree-emoji', { text: n.icon }) : icon(kids ? 'files' : 'file', 15, 'tree-icon'),
       h('span.tree-label', { text: n.name }),
-      h('div.tree-actions', {}, h('button.icon-btn.tiny', { title: 'Mehr', onclick: (e) => { e.stopPropagation(); this.noteMenu(n, e.currentTarget); } }, icon('more', 13))));
+      h('div.tree-actions', {},
+        isFav ? null : h('button.icon-btn.tiny', { title: 'Unterseite hinzufügen', onclick: (e) => { e.stopPropagation(); this.app.createSubpage(n.path); } }, icon('plus', 13)),
+        h('button.icon-btn.tiny', { title: 'Mehr', onclick: (e) => { e.stopPropagation(); this.noteMenu(n, e.currentTarget); } }, icon('more', 13))));
     row.addEventListener('click', () => this.app.openNote(n.path));
     row.addEventListener('auxclick', (e) => { if (e.button === 1) this.app.openNote(n.path); });
     row.addEventListener('contextmenu', (e) => { e.preventDefault(); this.noteMenu(n, { x: e.clientX, y: e.clientY }); });
-    if (!isFav) this.makeDraggable(row, n.path);
-    return row;
+    if (isFav) return row;
+    this.makeDraggable(row, n.path);
+    // Auf eine Seite ziehen = zur Unterseite machen
+    const children = h('div.tree-children' + (open ? '.open' : ''));
+    const inner = h('div.tree-children-inner');
+    children.append(inner);
+    if (open) this.renderNodes(kids, inner, depth + 1);
+    const toggle = (force) => {
+      if (!kids) return;
+      const isOpen = force ?? !row.classList.contains('open');
+      row.classList.toggle('open', isOpen);
+      if (isOpen) { this.expanded.add(n.path); if (!inner.children.length) this.renderNodes(kids, inner, depth + 1); }
+      else this.expanded.delete(n.path);
+      children.classList.toggle('open', isOpen);
+      this.saveExpanded();
+    };
+    chevron.addEventListener('click', (e) => { e.stopPropagation(); toggle(); });
+    this.makeDropTarget(row, childFolder(n.path), () => toggle(true), n.path);
+    return h('div.tree-node', {}, row, children);
   }
 
   noteMenu(n, pos) {
@@ -248,6 +275,7 @@ export class Sidebar {
     const fav = (app.settings.favorites || []).includes(n.path);
     contextMenu([
       { label: 'Öffnen', icon: 'file', run: () => app.openNote(n.path) },
+      { label: 'Unterseite hinzufügen', icon: 'filePlus', run: () => app.createSubpage(n.path) },
       { label: fav ? 'Aus Favoriten entfernen' : 'Zu Favoriten', icon: 'star', run: () => app.toggleFavorite(n.path) },
       '-',
       { label: 'Umbenennen', icon: 'edit', shortcut: 'F2', run: () => this.inlineRename(n.path) },
@@ -309,14 +337,15 @@ export class Sidebar {
     row.addEventListener('dragend', () => { this.dragPath = null; row.classList.remove('dragging'); this.treeEl.querySelectorAll('.drop-into').forEach((x) => x.classList.remove('drop-into')); });
   }
 
-  makeDropTarget(row, folderPath) {
+  makeDropTarget(row, folderPath, expand = () => row.click(), selfPath = folderPath) {
     let timer;
     row.addEventListener('dragover', (e) => {
-      if (!this.dragPath || this.dragPath === folderPath || folderPath.startsWith(this.dragPath + '/')) return;
+      const own = this.dragPath?.endsWith('.alenote') ? childFolder(this.dragPath) : this.dragPath;
+      if (!this.dragPath || this.dragPath === selfPath || folderPath === own || folderPath.startsWith(own + '/')) return;
       e.preventDefault();
       e.stopPropagation();
       row.classList.add('drop-into');
-      if (!timer && !row.classList.contains('open')) timer = setTimeout(() => row.click(), 700);
+      if (!timer && !row.classList.contains('open')) timer = setTimeout(expand, 700);
     });
     row.addEventListener('dragleave', () => { row.classList.remove('drop-into'); clearTimeout(timer); timer = null; });
     row.addEventListener('drop', (e) => {
@@ -325,7 +354,7 @@ export class Sidebar {
       clearTimeout(timer); timer = null;
       row.classList.remove('drop-into');
       if (this.dragPath) {
-        this.expanded.add(folderPath);
+        this.expanded.add(selfPath);
         this.app.moveItem(this.dragPath, folderPath);
       }
     });
@@ -333,17 +362,20 @@ export class Sidebar {
 
   setActive(path) {
     this.el.querySelectorAll('.tree-item.note').forEach((el) => el.classList.toggle('active', el.dataset.path === path));
-    // Ordner der aktiven Notiz aufklappen
+    // Ordner bzw. Elternseiten der aktiven Notiz aufklappen
     if (path && path.includes('/')) {
       const parts = path.split('/').slice(0, -1);
       let changed = false;
-      parts.forEach((_, i) => { const p = parts.slice(0, i + 1).join('/'); if (!this.expanded.has(p)) { this.expanded.add(p); changed = true; } });
+      parts.forEach((_, i) => {
+        const p = parts.slice(0, i + 1).join('/');
+        for (const k of [p, p + '.alenote']) if (!this.expanded.has(k)) { this.expanded.add(k); changed = true; }
+      });
       if (changed) { this.saveExpanded(); this.renderTree(); }
     }
   }
 
-  async confirmDelete(name, isFolder) {
-    return confirmDialog(isFolder ? 'Ordner löschen?' : 'Notiz löschen?', `„${name}“${isFolder ? ' und alle Inhalte werden' : ' wird'} in den Papierkorb verschoben und kann dort 30 Tage lang wiederhergestellt werden.`, { okLabel: 'In den Papierkorb' });
+  async confirmDelete(name, isFolder, hasSubpages = false) {
+    return confirmDialog(isFolder ? 'Ordner löschen?' : 'Notiz löschen?', `„${name}“${isFolder ? ' und alle Inhalte werden' : hasSubpages ? ' und alle Unterseiten werden' : ' wird'} in den Papierkorb verschoben und kann dort 30 Tage lang wiederhergestellt werden.`, { okLabel: 'In den Papierkorb' });
   }
 }
 

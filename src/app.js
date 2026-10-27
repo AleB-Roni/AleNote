@@ -25,6 +25,8 @@ import { datePicker } from './ui/datepicker.js';
 import { addQuickNote, dueLabel } from './core/todos.js';
 import { moveToTrash, listTrash, restoreFromTrash, purgeExpired } from './core/trash.js';
 import { openTrash } from './ui/trash.js';
+import { initSubpages } from './ui/subpages.js';
+import { childFolder, parentOf, isNotePath, remap as remapPath, remapPageLinks } from './core/pages.js';
 import { openTemplatePicker, saveCurrentAsTemplate } from './ui/templates.js';
 import { openHistory } from './ui/history.js';
 import { exportPdf, exportDocx, openImport } from './ui/export.js';
@@ -79,6 +81,7 @@ class App {
     let tree = [];
     await safe('Notizen laden', async () => { tree = await this.sidebar.refresh(); });
     this.reminders = new ReminderService(this);
+    initSubpages(this);
     if (!tree.length && !this.settings.welcomed) {
       const p = await api.createNote('', 'Willkommen bei AleNote', welcomeNote());
       await this.saveSettings({ welcomed: true });
@@ -287,11 +290,15 @@ class App {
     this.breadcrumbEl.innerHTML = '';
     if (!path) return;
     const parts = path.split('/');
+    const notes = this.sidebar.allNotes();
     parts.forEach((p, i) => {
       const last = i === parts.length - 1;
       const label = last ? p.replace(/\.alenote$/, '') : p;
       if (i) this.breadcrumbEl.append(h('span.crumb-sep', { text: '/' }));
-      this.breadcrumbEl.append(h('span.crumb' + (last ? '.current' : ''), {}, last && this.editor.note?.icon ? this.editor.note.icon + ' ' : '', label));
+      // Gehört der Ordner zu einer Seite, führt die Krume zu dieser Elternseite
+      const page = !last && notes.find((n) => n.path === parts.slice(0, i + 1).join('/') + '.alenote');
+      if (page) this.breadcrumbEl.append(h('button.crumb.crumb-page', { title: 'Zu „' + page.name + '“', onclick: () => this.openNote(page.path) }, page.icon ? page.icon + ' ' : '', page.name));
+      else this.breadcrumbEl.append(h('span.crumb' + (last ? '.current' : ''), {}, last && this.editor.note?.icon ? this.editor.note.icon + ' ' : '', label));
     });
     const fav = (this.settings.favorites || []).includes(path);
     this.mainEl.querySelector('.fav-btn').classList.toggle('active', fav);
@@ -345,7 +352,7 @@ class App {
 
   /** Pfade in Einstellungen (Favoriten, Zuletzt, ...) nach Umbenennen/Verschieben anpassen */
   remapPaths(from, to) {
-    const map = (p) => (p === from ? to : p.startsWith(from + '/') ? to + p.slice(from.length) : p);
+    const map = (p) => remapPath(p, from, to);
     const favorites = (this.settings.favorites || []).map(map);
     const recent = (this.settings.recent || []).map(map);
     const expanded = [...this.sidebar.expanded].map(map);
@@ -356,11 +363,26 @@ class App {
     this.saveSettings({ favorites, recent, expanded, lastOpen: this.currentPath });
   }
 
+  /** Ordner mit den Unterseiten einer Seite (oder null) */
+  subFolderOf(path) {
+    return isNotePath(path) ? this.sidebar.allNotes().find((n) => n.path === path)?.sub || null : null;
+  }
+
+  /** Unterseiten-Ordner an den (evtl. umbenannten/verschobenen) Seitenpfad anpassen */
+  async followSubFolder(sub, np) {
+    const want = childFolder(np);
+    if (parentOf(sub) !== parentOf(want)) sub = await api.move(sub, parentOf(want));
+    if (sub !== want) sub = await api.rename(sub, want.split('/').pop());
+    return sub;
+  }
+
   async renameItem(path, newName) {
     await this.saveNow();
     try {
+      const sub = this.subFolderOf(path);
       const np = await api.rename(path, newName);
-      if (np !== path) this.remapPaths(path, np);
+      if (np !== path && sub) await this.followSubFolder(sub, np);
+      if (np !== path) { this.remapPaths(path, np); await remapPageLinks(this, path, np); }
       await this.sidebar.refresh();
       this.updateChrome();
       if (this.editor.titleEl && this.currentPath === np) this.editor.titleEl.textContent = this.editor.title;
@@ -381,12 +403,28 @@ class App {
   async moveItem(path, folder) {
     await this.saveNow();
     try {
+      const sub = this.subFolderOf(path);
+      const own = isNotePath(path) ? childFolder(path) : path;
+      if (folder === own || (folder || '').startsWith(own + '/')) throw new Error('Eine Seite kann nicht in ihre eigenen Unterseiten verschoben werden');
+      if (folder) await api.ensureFolder(folder);
       const np = await api.move(path, folder);
-      if (np !== path) { this.remapPaths(path, np); toast('Verschoben', { type: 'success' }); }
+      if (np !== path && sub) await this.followSubFolder(sub, np);
+      if (np !== path) { this.remapPaths(path, np); await remapPageLinks(this, path, np); toast('Verschoben', { type: 'success' }); }
       await this.sidebar.refresh();
       this.updateChrome();
       this.sidebar.setActive(this.currentPath);
     } catch (err) { toast(err.message, { type: 'error' }); }
+  }
+
+  /** Neue Unterseite in einer Seite anlegen (und öffnen) */
+  async createSubpage(parent, name = 'Unbenannt', { open = true } = {}) {
+    await this.saveNow();
+    this.sidebar.expanded.add(parent);
+    this.sidebar.saveExpanded();
+    if (open) return this.createNote(childFolder(parent), name);
+    const p = await api.createNote(childFolder(parent), name, { version: 1, created: Date.now(), updated: Date.now(), icon: '', blocks: [], floats: [] });
+    await this.sidebar.refresh();
+    return p;
   }
 
   async duplicateNote(path) {
@@ -397,14 +435,15 @@ class App {
   }
 
   async deleteItem(path, name, isFolder = false) {
-    if (!(await this.sidebar.confirmDelete(name, isFolder))) return;
-    const affectsCurrent = this.currentPath && (this.currentPath === path || this.currentPath.startsWith(path + '/'));
+    const sub = this.subFolderOf(path);
+    if (!(await this.sidebar.confirmDelete(name, isFolder, !!this.sidebar.allNotes().find((n) => n.path === path)?.children?.length))) return;
+    const affectsCurrent = this.currentPath && (this.currentPath === path || this.currentPath.startsWith(path + '/') || (sub && this.currentPath.startsWith(sub + '/')));
     await this.saveNow(); // letzte Änderungen mit in den Papierkorb nehmen
     if (affectsCurrent) { this.scheduleSave.cancel(); this.editor.note = null; }
     let trashed;
-    try { trashed = await moveToTrash(api, path); }
+    try { trashed = await moveToTrash(api, path, sub ? [sub] : []); }
     catch (err) { toast('Löschen fehlgeschlagen: ' + err.message, { type: 'error' }); if (affectsCurrent) this.showEmpty(); return; }
-    this.saveSettings({ favorites: (this.settings.favorites || []).filter((p) => p !== path && !p.startsWith(path + '/')) });
+    this.saveSettings({ favorites: (this.settings.favorites || []).filter((p) => p !== path && !p.startsWith(path + '/') && !(sub && p.startsWith(sub + '/'))) });
     await this.sidebar.refresh();
     if (affectsCurrent) this.showEmpty();
     toast(`„${name}“ ist im Papierkorb`, {
@@ -549,6 +588,7 @@ class App {
     r.registerCommand({ id: 'core.favorite', name: 'Favorit umschalten', icon: 'star', shortcut: 'Ctrl+Alt+F', group: 'Notizen', when: hasNote, run: () => this.toggleFavorite(this.currentPath) });
     r.registerCommand({ id: 'core.reload', name: 'AleNote neu laden', icon: 'refresh', shortcut: 'Ctrl+R', group: 'Allgemein', when: () => !inTable(), run: async () => { await this.saveNow(); location.reload(); } });
     r.registerCommand({ id: 'core.quickNote', name: 'Schnellnotiz', icon: 'zap', shortcut: 'Ctrl+Shift+Space', group: 'Notizen', run: () => this.quickNote() });
+    r.registerCommand({ id: 'core.newSubpage', name: 'Neue Unterseite', icon: 'files', shortcut: 'Ctrl+Alt+U', group: 'Notizen', when: () => !!this.currentPath, run: () => this.createSubpage(this.currentPath) });
     r.registerCommand({ id: 'core.calendar', name: 'Kalender öffnen', icon: 'calendar', shortcut: 'Ctrl+Alt+K', group: 'Navigation', run: () => this.openCalendar() });
     r.registerCommand({ id: 'core.todoDue', name: 'Fälligkeitsdatum festlegen', icon: 'calendar', shortcut: 'Ctrl+Shift+T', group: 'Bearbeiten', when: hasNote, run: () => this.setDueForFocused() });
     r.registerCommand({ id: 'core.exportPdf', name: 'Als PDF exportieren', icon: 'download', group: 'Export', when: hasNote, noteMenu: true, run: () => exportPdf(this) });
@@ -585,6 +625,19 @@ class App {
   }
 
   registerCoreSlashCommands() {
+    this.registry.registerSlashCommand({
+      id: 'core.subpage', name: 'Unterseite', icon: 'files', group: 'Einfügen', description: 'Neue Seite innerhalb dieser Seite (wie ein Unterordner)', keywords: ['seite', 'unterseite', 'page', 'subpage', 'doku', 'ordner', 'kapitel'],
+      run: async (editor, { blockId }) => {
+        const parent = this.currentPath;
+        if (!parent) return;
+        const p = await this.createSubpage(parent, 'Unbenannt', { open: false });
+        if (blockId && editor.block(blockId)) editor.convertBlock(blockId, 'page', { path: p });
+        else editor.insertBlock('page', { path: p });
+        await this.saveNow();
+        await this.openNote(p);
+        setTimeout(() => { this.editor.titleEl?.focus(); document.execCommand('selectAll'); }, 60);
+      }
+    });
     this.registry.registerSlashCommand({
       id: 'core.template', name: 'Vorlage einfügen', icon: 'layers', group: 'Einfügen', description: 'Inhalt einer Vorlage hier einfügen', keywords: ['vorlage', 'template', 'muster'],
       run: (editor, { blockId }) => openTemplatePicker(this, { mode: 'insert', afterId: blockId })

@@ -258,6 +258,48 @@ body.hide-handles .block-gutter, body.is-dragging .block-gutter { display: none;
 body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select: none !important; }
 .page-tail { min-height: 140px; cursor: text; }
 
+/* Seiten-Block: Verweis auf eine Unterseite */
+.page-link {
+  display: flex; align-items: center; gap: 10px; width: 100%; padding: 9px 12px; margin: 2px 0;
+  border-radius: 10px; border: 1px solid var(--border); background: var(--bg-2); color: var(--text);
+  text-align: left; font-size: 15px; cursor: pointer; transition: background .15s, border-color .15s, transform .15s var(--spring);
+}
+.page-link:hover { background: var(--bg-hover); border-color: color-mix(in srgb, var(--accent) 35%, var(--border)); }
+.page-link:active { transform: scale(.99); }
+.page-link-emoji { font-size: 18px; line-height: 1; }
+.page-link-icon { color: var(--accent); }
+.page-link-title { font-weight: 600; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.page-link-count { font-size: 12px; color: var(--text-3); }
+.page-link-arrow { color: var(--text-3); }
+.page-link.missing { cursor: default; color: var(--text-3); border-style: dashed; flex-wrap: wrap; }
+
+/* Unterseiten unten auf der Seite */
+.subpages { margin: 18px 0 0; }
+.subpages:not(.has-kids) { opacity: 0; transition: opacity .2s; }
+.page:hover .subpages, .subpages:focus-within, .touch .subpages { opacity: 1; }
+.subpages-head { display: flex; align-items: center; gap: 7px; color: var(--text-3); font-size: 12.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; padding: 10px 0 8px; border-top: 1px solid var(--border); }
+.subpage-add { display: inline-flex; align-items: center; gap: 5px; height: 28px; padding: 0 10px; border-radius: 8px; color: var(--text-3); font-size: 13px; text-transform: none; letter-spacing: 0; font-weight: 500; }
+.subpage-add:hover { background: var(--bg-hover); color: var(--text); }
+.subpages-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 8px; }
+.subpage-card {
+  display: flex; align-items: center; gap: 9px; min-width: 0; padding: 11px 12px; border-radius: 10px;
+  border: 1px solid var(--border); background: var(--bg-2); color: var(--text); text-align: left; font-size: 14px;
+  transition: background .15s, border-color .15s, transform .15s var(--spring);
+}
+.subpage-card .icon { color: var(--accent); flex: none; }
+.subpage-card:hover { background: var(--bg-hover); border-color: color-mix(in srgb, var(--accent) 35%, var(--border)); transform: translateY(-1px); }
+.subpage-card.folder { opacity: .7; cursor: default; }
+.subpage-card.folder:hover { transform: none; }
+.subpage-emoji { font-size: 17px; line-height: 1; flex: none; }
+.subpage-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.subpage-meta { font-size: 11.5px; color: var(--text-3); background: var(--bg-hover); border-radius: 99px; padding: 1px 7px; }
+
+/* Seiten mit Unterseiten in der Seitenleiste */
+.tree-item.note.has-kids > .tree-chevron { cursor: pointer; border-radius: 4px; }
+.tree-item.note.has-kids > .tree-chevron:hover { background: var(--bg-hover); color: var(--text); }
+.crumb-page { color: var(--text-2); border-radius: 6px; padding: 1px 5px; margin: 0 -3px; }
+.crumb-page:hover { background: var(--bg-hover); color: var(--text); }
+
 /* Farben */
 .block[data-color^="bg-"] { padding-top: 2px; padding-bottom: 2px; }
 .block[data-color="gray"] .block-content { color: var(--c-gray); } .block[data-color="brown"] .block-content { color: var(--c-brown); }
@@ -742,6 +784,7 @@ body.cell-filling, body.cell-filling * { user-select: none !important; cursor: c
 /* ---------- Handy & Touch ---------- */
 .range-handle { display: none; position: absolute; right: -9px; top: calc(50% - 9px); width: 18px; height: 18px; border-radius: 50%; background: var(--bg); border: 2.5px solid var(--accent); pointer-events: auto; touch-action: none; }
 body.touch .range-handle { display: block; }
+body.touch .tree-item.note.has-kids > .tree-chevron { width: 28px; height: 28px; margin: -6px 0 -6px -6px; align-items: center; justify-content: center; }
 body.touch .fill-handle { width: 16px; height: 16px; right: -9px; bottom: -9px; }
 .fill-handle, .float-handle, .float-grip, .gutter-btn.grip, .col-resize, .img-resize { touch-action: none; }
 .float-item:not(.float-block) { touch-action: none; }
@@ -1282,7 +1325,7 @@ body.is-web .ai-panel-head { padding-right: 14px; }
   }
   html, body { height: auto !important; overflow: visible !important; background: #fff !important; }
   #app { display: block !important; height: auto !important; opacity: 1 !important; }
-  .sidebar, .topbar, .ai-panel, .multi-bar, .toast-host, .draw-toolbar, .block-gutter, .page-header-actions, .page-tail,
+  .sidebar, .topbar, .ai-panel, .multi-bar, .toast-host, .draw-toolbar, .block-gutter, .page-header-actions, .page-tail, .subpages,
   .drawer-backdrop, .todo-due:not(.has), .cover-actions, .code-copy, .table-add, .table-toolbar, .formula-bar, .float-toolbar, .float-block-tools, .float-handle, .float-grip, .draw-capture, .image-tools, .table-tools, .ai-result, .slash-menu, .inline-toolbar, .menu { display: none !important; }
   .main { display: block !important; height: auto !important; }
   .editor-scroll { overflow: visible !important; height: auto !important; animation: none !important; }

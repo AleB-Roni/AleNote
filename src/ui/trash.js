@@ -41,7 +41,7 @@ export async function openTrash(app) {
           h('div.trash-name', { text: it.name }),
           h('div.trash-meta.muted.small', {
             text: [
-              it.type === 'folder' ? `Ordner · ${it.count} ${it.count === 1 ? 'Notiz' : 'Notizen'}` : null,
+              it.type === 'folder' ? `Ordner · ${it.count} ${it.count === 1 ? 'Notiz' : 'Notizen'}` : it.count > 1 ? `mit ${it.count - 1} ${it.count === 2 ? 'Unterseite' : 'Unterseiten'}` : null,
               `aus ${it.from ? '„' + it.from + '“' : 'Hauptebene'}`,
               `gelöscht ${when(it.deletedAt)}`
             ].filter(Boolean).join(' · ')

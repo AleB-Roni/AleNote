@@ -103,6 +103,10 @@ export class Editor {
     note.blocks.forEach((b) => this.blocksEl.append(this.renderRow(b)));
     this.updateNumbering();
 
+    // Unterseiten dieser Seite (füllt ui/subpages.js)
+    this.subpagesEl = h('div.subpages', { contenteditable: 'false' });
+    this.page.append(this.subpagesEl);
+
     // Klick unter dem letzten Block → neuen Absatz anlegen
     const tail = h('div.page-tail', { onclick: () => this.focusEndOrCreate() });
     this.page.append(tail);

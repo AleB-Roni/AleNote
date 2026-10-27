@@ -3,9 +3,11 @@
 import registerTextBlocks from './text.js';
 import registerMediaBlocks from './media.js';
 import registerTable from './table.js';
+import registerPageBlock from './page.js';
 
 export function registerBuiltinBlocks(registry) {
   registerTextBlocks(registry);
   registerTable(registry);
   registerMediaBlocks(registry);
+  registerPageBlock(registry);
 }

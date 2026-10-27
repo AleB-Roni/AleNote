@@ -14,11 +14,16 @@ const unb64 = (s) => { try { return decodeURIComponent(escape(atob(s.replace(/-/
 const parentOf = (p) => (p.includes('/') ? p.slice(0, p.lastIndexOf('/')) : '');
 const nameOf = (p) => p.slice(p.lastIndexOf('/') + 1);
 
-/** Notiz oder Ordner in den Papierkorb verschieben. Gibt den Pfad im Papierkorb zurück. */
-export async function moveToTrash(api, path) {
+/**
+ * Notiz oder Ordner in den Papierkorb verschieben. Gibt den Pfad im Papierkorb zurück.
+ * extra: weitere Pfade aus demselben Ordner, z.B. der Ordner mit den Unterseiten einer Seite.
+ */
+export async function moveToTrash(api, path, extra = []) {
   const holder = `${TRASH_DIR}/${Date.now()}~${b64(parentOf(path))}`;
   await api.ensureFolder(holder);
-  return api.move(path, holder);
+  const moved = await api.move(path, holder);
+  for (const p of extra) await api.move(p, holder);
+  return moved;
 }
 
 /** Alle Einträge im Papierkorb, neueste zuerst */
@@ -32,10 +37,16 @@ export async function listTrash(api) {
     if (!m) continue;
     const deletedAt = Number(m[1]);
     const from = unb64(m[2]);
-    for (const n of holder.children || []) {
-      const count = n.type === 'folder' ? countNotes(n) : 1;
+    const kids = holder.children || [];
+    // Ordner, der zu einer Seite daneben gehört (= ihre Unterseiten), zählt zur Seite
+    const subOf = (n) => n.type === 'note' && kids.find((k) => k.type === 'folder' && k.path === n.path.replace(/\.alenote$/, ''));
+    const owned = new Set(kids.map(subOf).filter(Boolean));
+    for (const n of kids) {
+      if (owned.has(n)) continue;
+      const sub = subOf(n);
+      const count = n.type === 'folder' ? countNotes(n) : 1 + (sub ? countNotes(sub) : 0);
       items.push({
-        holder: holder.path, path: n.path, type: n.type, icon: n.icon || '', name: n.name, count, from, deletedAt,
+        holder: holder.path, path: n.path, extra: sub ? [sub.path] : [], type: n.type, icon: n.icon || '', name: n.name, count, from, deletedAt,
         expiresAt: deletedAt + KEEP_DAYS * 864e5
       });
     }
@@ -51,6 +62,12 @@ const countNotes = (n) => (n.type === 'note' ? 1 : (n.children || []).reduce((s,
 export async function restoreFromTrash(api, item) {
   if (item.from) await api.ensureFolder(item.from);
   const restored = await api.move(item.path, item.from);
+  // Unterseiten mitnehmen und an den (evtl. umbenannten) Seitennamen anpassen
+  for (const p of item.extra || []) {
+    let sub = await api.move(p, item.from);
+    const want = restored.replace(/\.alenote$/, '');
+    if (sub !== want) sub = await api.rename(sub, want.slice(want.lastIndexOf('/') + 1));
+  }
   await api.remove(item.holder).catch(() => {});
   return restored;
 }
