@@ -39,7 +39,7 @@ export function welcomeNote() {
       b('numbered', { text: 'Ordner und Unterordner in der Seitenleiste anlegen' }),
       b('numbered', { text: 'Notizen per Drag & Drop in Ordner verschieben' }),
       b('numbered', { text: 'Rechtsklick für alle Optionen, ★ für Favoriten' }),
-      b('toggle', { text: 'Für Entwickler: AleNote erweitern', body: 'Alles in AleNote ist ein Plugin oder eine Registrierung: Blöcke, Befehle, Themes, Seitenleisten-Bereiche und Platzhalter. Eigene Plugins kommen nach <code>&lt;Vault&gt;/.alenote/plugins/</code>. Beispiele findest du in <code>src/plugins/</code> und in der README.', open: false }),
+      b('toggle', { text: 'Für Entwickler: AleNote erweitern', body: 'Alles in AleNote ist ein Plugin oder eine Registrierung: Blöcke, Befehle, Themes, Seitenleisten-Bereiche und Platzhalter. Eigene Plugins kommen nach <code>&lt;Vault&gt;/.alenote/plugins/</code>. Beispiele findest du in <code>src/builtin-plugins/</code> und in der README.', open: false }),
       b('progress', { value: 75, label: 'AleNote kennenlernen' }),
       b('quote', { text: 'Die beste Notiz ist die, die du auch wiederfindest.' }),
       b('paragraph', { text: '' })

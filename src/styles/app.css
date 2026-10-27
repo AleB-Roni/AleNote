@@ -1142,3 +1142,4 @@ body.block-selecting, body.block-selecting * { user-select: none !important; cur
 .multi-bar .multi-ai { color: var(--accent); font-weight: 600; }
 .multi-count { font-size: 12.5px; color: var(--text-2); padding: 0 8px 0 6px; font-variant-numeric: tabular-nums; }
 .multi-sep { width: 1px; height: 18px; background: var(--border); margin: 0 3px; }
+body.boot-failed #app { opacity: 1; display: block; overflow: auto; }

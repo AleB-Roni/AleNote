@@ -170,7 +170,7 @@ src/
     api.js           Dateizugriff (mit Browser-Fallback zum Testen)
     utils.js, shortcuts.js, history.js
   blocks/            eingebaute Blocktypen (text.js, table.js, media.js)
-  plugins/           eingebaute Plugins (gute Vorlagen!)
+  builtin-plugins/   eingebaute Plugins (gute Vorlagen!)
   ui/                editor, sidebar, palette, settings, slashmenu, toolbar, floats, pickers, overlays, icons
   styles/app.css     gesamtes Design + Animationen
 ```
@@ -179,7 +179,7 @@ src/
 
 Am einfachsten geht es mit einem **Plugin**. Dafür gibt es zwei Wege:
 
-- **Eingebaut**: Eine Datei in `src/plugins/` anlegen und in `src/plugins/index.js` eintragen.
+- **Eingebaut**: Eine Datei in `src/builtin-plugins/` anlegen und in `src/builtin-plugins/index.js` eintragen.
 - **Ohne den Code anzufassen**: `<Vault>\.alenote\plugins\mein-plugin\plugin.js` anlegen, dann Strg+R.
 
 ```js

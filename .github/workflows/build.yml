@@ -84,6 +84,8 @@ jobs:
         run: npm version "${{ needs.prepare.outputs.version }}" --no-git-tag-version --allow-same-version
       - name: Web-Dateien ins Android-Projekt kopieren
         run: npx cap sync android
+      - name: Prüfen, ob alle App-Dateien im Paket sind
+        run: node scripts/check-bundle.js android/app/src/main/assets/public
       - name: Eigenen Signaturschlüssel verwenden (falls als Secret hinterlegt)
         env:
           KEYSTORE_BASE64: ${{ secrets.ALENOTE_KEYSTORE_BASE64 }}

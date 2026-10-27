@@ -56,18 +56,22 @@ class App {
     this.palette = new CommandPalette(this);
     this.scheduleSave = debounce(() => this.saveNow(), this.settings.saveDelay || 600);
 
+    // Zusatzfunktionen: Fällt eine davon aus, startet AleNote trotzdem (Fehler wird angezeigt)
+    this.startErrors = [];
+    const safe = async (name, fn) => {
+      try { await fn(); }
+      catch (err) { console.error(err); this.startErrors.push(`${name}: ${err?.message || err}`); }
+    };
     this.plugins = new PluginManager(this);
-    await this.plugins.loadAll();
+    await safe('Plugins', () => this.plugins.loadAll());
     this.hotkeys.syncCustomHotkeys();
-    this.ai = new AIManager(this);
-    this.ai.registerAll();
+    await safe('KI', () => { this.ai = new AIManager(this); this.ai.registerAll(); });
 
-    this.account = new AccountUI(this);
-    await this.account.init();
-    this.updates = new UpdateUI(this);
-    this.updates.init();
+    await safe('Konto', async () => { this.account = new AccountUI(this); await this.account.init(); });
+    await safe('Updates', () => { this.updates = new UpdateUI(this); this.updates.init(); });
 
-    const tree = await this.sidebar.refresh();
+    let tree = [];
+    await safe('Notizen laden', async () => { tree = await this.sidebar.refresh(); });
     if (!tree.length && !this.settings.welcomed) {
       const p = await api.createNote('', 'Willkommen bei AleNote', welcomeNote());
       await this.saveSettings({ welcomed: true });
@@ -95,6 +99,7 @@ class App {
     this.events.on('todos:change', () => this.sidebar.updateBadge());
     this.events.on('note:save', (data) => { if ((data.blocks || []).some((b) => b.type === 'todo' && b.data?.due)) this.sidebar.updateBadge(); });
     document.body.classList.add('ready');
+    if (this.startErrors.length) toast('Beim Start ist ein Fehler aufgetreten – ' + this.startErrors.join(' · '), { type: 'error', duration: 12000 });
     this.events.emit('app:ready', this);
   }
 
@@ -607,5 +612,8 @@ const app = new App();
 window.AleNote = app; // für Entwickler-Konsole (F12)
 app.start().catch((err) => {
   console.error(err);
-  document.getElementById('app').innerHTML = `<div style="padding:40px;font-family:sans-serif;color:#f66">AleNote konnte nicht starten:<pre>${err.stack || err}</pre></div>`;
+  document.body.classList.add('boot-failed');
+  document.getElementById('app').innerHTML = `<div class="boot-error"><h2>AleNote konnte nicht starten</h2><p>Bitte mach ein Foto von dieser Meldung.</p><pre></pre><button class="btn btn-primary">Neu laden</button></div>`;
+  document.querySelector('.boot-error pre').textContent = String(err?.stack || err);
+  document.querySelector('.boot-error button').addEventListener('click', () => location.reload());
 });

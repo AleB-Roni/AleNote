@@ -10,11 +10,11 @@
 //     deactivate(app) { ... }    // optional
 //   };
 //
-// Eingebaute Plugins liegen in src/plugins/ (Liste in src/plugins/index.js).
+// Eingebaute Plugins liegen in src/builtin-plugins/ (Liste in src/builtin-plugins/index.js).
 // Eigene Plugins kommen in den Vault-Ordner:  <Vault>/.alenote/plugins/<name>/plugin.js
 
 import { api } from './api.js';
-import { builtinPlugins } from '../plugins/index.js';
+import { builtinPlugins } from '../builtin-plugins/index.js';
 
 export class PluginManager {
   constructor(app) {

@@ -5,6 +5,7 @@
     var app = document.getElementById('app');
     if (!app || document.body.classList.contains('ready')) return;
     app.innerHTML = '';
+    document.body.classList.add('boot-failed');
     var box = document.createElement('div');
     box.className = 'boot-error';
     var h = document.createElement('h2'); h.textContent = title; box.appendChild(h);
