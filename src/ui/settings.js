@@ -1,6 +1,7 @@
 // Einstellungen: Darstellung, Editor, Hotkeys, Plugins, Vault
 import { h } from '../core/utils.js';
 import { renderAISettings } from '../ai/ai-settings.js';
+import { quickSettings } from '../core/todos.js';
 import { icon } from './icons.js';
 import { modal, toast, confirmDialog } from './overlays.js';
 import { eventToShortcut, shortcutHtml } from '../core/shortcuts.js';
@@ -18,6 +19,7 @@ export function openSettings(app, tab = 'appearance') {
     ['appearance', 'Darstellung', 'palette'],
     ['editor', 'Editor', 'edit'],
     ['hotkeys', 'Hotkeys', 'keyboard'],
+    ['quick', 'Schnellnotiz', 'zap'],
     ['ai', 'KI', 'sparkles'],
     ['account', 'Konto & Sync', 'user'],
     ['plugins', 'Plugins', 'puzzle'],
@@ -33,7 +35,7 @@ export function openSettings(app, tab = 'appearance') {
     nav.querySelectorAll('.settings-tab').forEach((b) => b.classList.toggle('active', b.dataset.tab === id));
     body.innerHTML = '';
     const page = h('div.settings-page');
-    ({ appearance, editor, hotkeys, ai, account, plugins, vault, about })[id](app, page, () => show(id), m);
+    ({ appearance, editor, hotkeys, quick, ai, account, plugins, vault, about })[id](app, page, () => show(id), m);
     body.append(page);
     body.scrollTop = 0;
   };
@@ -234,6 +236,39 @@ function hotkeys(app, page, rerender) {
   }
   page.append(table);
   page.append(h('p.muted.small', { html: 'Fest eingebaut: <kbd>Strg</kbd><kbd>B</kbd> Fett · <kbd>Strg</kbd><kbd>I</kbd> Kursiv · <kbd>Strg</kbd><kbd>U</kbd> Unterstrichen · <kbd>Strg</kbd><kbd>E</kbd> Code · <kbd>Strg</kbd><kbd>K</kbd> Link · <kbd>Strg</kbd><kbd>A</kbd> 1× Block, 2× alles · <kbd>Tab</kbd> Einrücken · <kbd>/</kbd> Befehle' }));
+}
+
+function quick(app, page, rerender) {
+  const qs = quickSettings(app);
+  const set = (patch) => app.saveSettings({ quicknote: { ...(app.settings.quicknote || {}), ...patch } });
+  const desktop = !!app.api.quickShortcutStatus;
+
+  page.append(section('Schnellnotiz', 'Ein kleines Fenster zum schnellen Festhalten. Jeder Eintrag landet mit Datum und Uhrzeit in deiner Quicknotizen-Notiz – auf Wunsch als To-do mit Fälligkeitsdatum.'));
+  const notes = app.sidebar.allNotes();
+  const opts = notes.map((n) => [n.path, (n.icon ? n.icon + ' ' : '') + n.path.replace(/\.alenote$/, '')]);
+  if (!opts.some(([p]) => p === qs.target)) opts.unshift([qs.target, qs.target.replace(/\.alenote$/, '') + ' (wird angelegt)']);
+  page.append(row('Ziel-Notiz', 'Standard für neue Einträge. Im Schnellnotiz-Fenster kannst du jedes Mal eine andere wählen.', select(opts, qs.target, (v) => set({ target: v }))));
+  page.append(row('Neue Einträge', null, select([['bottom', 'Unten anhängen (chronologisch)'], ['top', 'Oben einfügen (neueste zuerst)']], qs.order, (v) => set({ order: v }))));
+  page.append(row('Standardmäßig als To-do', 'Einträge werden als Aufgabe mit Checkbox gespeichert', toggle(!!qs.asTodo, (v) => set({ asTodo: v }))));
+  page.append(row('Tastenkürzel in AleNote', 'Öffnet die Schnellnotiz im App-Fenster', shortcutRecorder(app, app.hotkeys.shortcutFor('core.quickNote'), (v) => { app.saveSettings({ shortcutOverrides: { ...app.hotkeys.overrides, 'core.quickNote': v } }); }, { exceptId: 'core.quickNote' })));
+  if (desktop) {
+    const status = h('div.muted.small');
+    const showStatus = async () => {
+      const r = await app.api.quickShortcutStatus();
+      status.textContent = r.ok ? (qs.globalShortcut ? '✓ Aktiv – funktioniert überall in Windows, solange AleNote läuft.' : 'Ausgeschaltet') : '✗ ' + r.error;
+      status.className = 'small ' + (r.ok ? 'ai-ok' : 'ai-err');
+    };
+    page.append(row('Globale Tastenkombination', 'Öffnet ein eigenes kleines Fenster – auch wenn AleNote im Hintergrund ist', h('div.set-stack', {},
+      shortcutRecorder(app, qs.globalShortcut, async (v) => { qs.globalShortcut = v; await set({ globalShortcut: v }); showStatus(); }),
+      status)));
+    showStatus();
+    page.append(h('div.row-gap', {}, h('button.btn', { onclick: () => app.api.openQuickWindow() }, icon('zap', 15), 'Schnellnotiz-Fenster testen')));
+  }
+
+  page.append(section('Kalender', 'Zeigt alle To-dos mit Fälligkeitsdatum aus deinen Notizen. Jeder Benutzer sieht nur seine eigenen Aufgaben.'));
+  page.append(row('Tastenkürzel', null, shortcutRecorder(app, app.hotkeys.shortcutFor('core.calendar'), (v) => app.saveSettings({ shortcutOverrides: { ...app.hotkeys.overrides, 'core.calendar': v } }), { exceptId: 'core.calendar' })));
+  page.append(row('Fälligkeitsdatum setzen', 'Im To-do auf 📅 klicken, „/To-do mit Datum“ oder dieses Kürzel', shortcutRecorder(app, app.hotkeys.shortcutFor('core.todoDue'), (v) => app.saveSettings({ shortcutOverrides: { ...app.hotkeys.overrides, 'core.todoDue': v } }), { exceptId: 'core.todoDue' })));
+  page.append(h('div.row-gap', {}, h('button.btn.btn-primary', { onclick: () => { document.querySelector('.settings-modal')?.closest('.modal-backdrop')?.querySelector('.modal-header .icon-btn')?.click(); app.openCalendar(); } }, icon('calendar', 15), 'Kalender öffnen')));
 }
 
 function ai(app, page, rerender) {

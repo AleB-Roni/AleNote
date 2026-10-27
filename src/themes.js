@@ -36,3 +36,21 @@ export function registerBuiltinThemes(registry) {
     '--bg': '#fffafb', '--bg-2': '#fbf0f3', '--bg-3': '#f4e1e7', '--bg-hover': 'rgba(180,40,90,.05)', '--panel': 'rgba(255,250,251,.95)',
     '--border': 'rgba(180,40,90,.10)', '--text': '#3d2a31', '--text-2': '#8a6b76', '--text-3': '#bba1aa', '--shadow': '0 12px 40px rgba(120,20,60,.13)', ...lightTones } });
 }
+
+/** Farbton verschieben (für den zweiten Akzent-Farbverlauf) */
+export function shiftHue(hex, deg) {
+  const m = hex.replace('#', '').match(/.{2}/g);
+  if (!m) return hex;
+  let [r, g, b] = m.map((x) => parseInt(x, 16) / 255);
+  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  let hh = 0, s = 0;
+  const l = (max + min) / 2;
+  if (max !== min) {
+    const d = max - min;
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    hh = max === r ? (g - b) / d + (g < b ? 6 : 0) : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
+    hh *= 60;
+  }
+  hh = (hh + deg) % 360;
+  return `hsl(${Math.round(hh)} ${Math.round(s * 100)}% ${Math.round(l * 100)}%)`;
+}

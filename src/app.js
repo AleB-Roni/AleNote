@@ -7,7 +7,7 @@ import { HotkeyManager, DEFAULT_HOTKEYS, registerDefaultVariables } from './core
 import { h, debounce } from './core/utils.js';
 import { registerBuiltinBlocks } from './blocks/index.js';
 import { editable, htmlToMarkdown } from './blocks/text.js';
-import { registerBuiltinThemes } from './themes.js';
+import { registerBuiltinThemes, shiftHue } from './themes.js';
 import { Editor } from './ui/editor.js';
 import { Sidebar } from './ui/sidebar.js';
 import { CommandPalette } from './ui/palette.js';
@@ -19,6 +19,10 @@ import { AccountUI } from './ui/account.js';
 import { UpdateUI } from './ui/updates.js';
 import { DrawToolbar } from './ui/drawing.js';
 import { AIManager } from './ai/ai.js';
+import { CalendarView } from './ui/calendar.js';
+import { openQuickNote } from './ui/quicknote.js';
+import { datePicker } from './ui/datepicker.js';
+import { addQuickNote, dueLabel } from './core/todos.js';
 import { initMobile, isNarrow } from './core/mobile.js';
 
 class App {
@@ -81,6 +85,15 @@ class App {
     this.events.on('note:open', () => { if (this.drawMode) this.editor.drawing?.setActive(true); });
     window.addEventListener('beforeunload', () => { if (this.dirty) this.saveNow(); });
     window.addEventListener('focus', () => this.sidebar.refresh());
+    // Schnellnotiz aus dem eigenen Fenster (globale Tastenkombination, nur Desktop)
+    api.on('quicknote:add', async (entry) => {
+      try {
+        const path = await addQuickNote(this, entry);
+        toast(`Schnellnotiz gespeichert in „${path.replace(/\.alenote$/, '').split('/').pop()}“${entry.due ? ' · fällig ' + dueLabel(entry.due, entry.dueTime) : ''}`, { type: 'success' });
+      } catch (err) { toast('Schnellnotiz: ' + err.message, { type: 'error' }); }
+    });
+    this.events.on('todos:change', () => this.sidebar.updateBadge());
+    this.events.on('note:save', (data) => { if ((data.blocks || []).some((b) => b.type === 'todo' && b.data?.due)) this.sidebar.updateBadge(); });
     document.body.classList.add('ready');
     this.events.emit('app:ready', this);
   }
@@ -117,6 +130,7 @@ class App {
   }
 
   showEmpty() {
+    this.closeCalendar();
     this.currentPath = null;
     this.editor.note = null;
     this.editorScroll.innerHTML = '';
@@ -188,6 +202,7 @@ class App {
     let note;
     try { note = await api.readNote(path); }
     catch (err) { toast('Notiz konnte nicht geöffnet werden', { type: 'error' }); console.error(err); this.sidebar.refresh(); return; }
+    this.closeCalendar();
     this.currentPath = path;
     this.mainEl.classList.add('has-note');
     this.editorScroll.classList.remove('page-enter');
@@ -201,6 +216,52 @@ class App {
     this.events.emit('note:open', this.editor.note, path);
     const first = this.editor.note.blocks[0];
     if (first && this.editor.note.blocks.length === 1 && !first.data.text) setTimeout(() => this.editor.titleEl.focus(), 50);
+  }
+
+  // ---------- Kalender & Schnellnotiz ----------
+  async openCalendar() {
+    if (this.calendar?.isOpen()) return;
+    await this.saveNow();
+    if (this.drawMode) this.toggleDrawMode(false);
+    this.currentPath = null;
+    this.editor.note = null;
+    this.mainEl.classList.remove('has-note');
+    this.mainEl.classList.add('calendar-mode');
+    this.breadcrumbEl.replaceChildren(h('span.crumb.current', {}, '📅 Kalender'));
+    this.statusEl.textContent = '';
+    this.sidebar.setActive(null);
+    this.sidebar.el.querySelector('.nav-calendar')?.classList.add('active');
+    document.title = 'Kalender – AleNote';
+    this.editorScroll.classList.remove('page-enter');
+    void this.editorScroll.offsetWidth;
+    this.editorScroll.classList.add('page-enter');
+    this.calendar = new CalendarView(this);
+    await this.calendar.mount(this.editorScroll);
+    this.setDrawer?.(false);
+  }
+
+  closeCalendar() {
+    if (!this.calendar) return;
+    this.calendar.destroy();
+    this.calendar = null;
+    this.mainEl.classList.remove('calendar-mode');
+    this.sidebar.el.querySelector('.nav-calendar')?.classList.remove('active');
+  }
+
+  quickNote(preset) {
+    this.setDrawer?.(false);
+    return openQuickNote(this, preset);
+  }
+
+  /** Fälligkeitsdatum für den aktuellen Block (wird bei Bedarf zum To-do) */
+  setDueForFocused(anchor) {
+    const id = document.activeElement?.closest?.('.block')?.dataset.id || this.editor.selectedBlockId;
+    let b = id && this.editor.block(id);
+    if (!b) return;
+    if (b.type !== 'todo') { if (!this.editor.def(b.type)?.text) return; this.editor.convertBlock(id, 'todo'); b = this.editor.block(id); }
+    const chip = this.editor.rowEl(id)?.querySelector('.todo-due');
+    if (chip) chip.click();
+    else datePicker(anchor || this.editor.rowEl(id), { due: b.data.due, time: b.data.dueTime, onPick: (d, t) => { Object.assign(b.data, { due: d, dueTime: t }); this.editor.rerenderBlock(id); this.editor.changed(true); } });
   }
 
   updateChrome() {
@@ -455,6 +516,9 @@ class App {
     r.registerCommand({ id: 'core.deleteNote', name: 'Aktuelle Notiz löschen', icon: 'trash', group: 'Notizen', when: hasNote, run: () => this.deleteItem(this.currentPath, this.editor.title) });
     r.registerCommand({ id: 'core.favorite', name: 'Favorit umschalten', icon: 'star', shortcut: 'Ctrl+Alt+F', group: 'Notizen', when: hasNote, run: () => this.toggleFavorite(this.currentPath) });
     r.registerCommand({ id: 'core.reload', name: 'AleNote neu laden', icon: 'refresh', shortcut: 'Ctrl+R', group: 'Allgemein', when: () => !inTable(), run: async () => { await this.saveNow(); location.reload(); } });
+    r.registerCommand({ id: 'core.quickNote', name: 'Schnellnotiz', icon: 'zap', shortcut: 'Ctrl+Shift+Space', group: 'Notizen', run: () => this.quickNote() });
+    r.registerCommand({ id: 'core.calendar', name: 'Kalender öffnen', icon: 'calendar', shortcut: 'Ctrl+Alt+K', group: 'Navigation', run: () => this.openCalendar() });
+    r.registerCommand({ id: 'core.todoDue', name: 'Fälligkeitsdatum festlegen', icon: 'calendar', shortcut: 'Ctrl+Shift+T', group: 'Bearbeiten', when: hasNote, run: () => this.setDueForFocused() });
     r.registerCommand({ id: 'core.vault', name: 'Vault wechseln', icon: 'vault', group: 'Allgemein', run: () => this.chooseVault() });
     for (let i = 1; i <= 3; i++) {
       r.registerCommand({ id: 'core.h' + i, name: `In Überschrift ${i} umwandeln`, icon: 'h' + i, shortcut: `Ctrl+Alt+${i}`, group: 'Formatieren', when: hasNote, run: () => this.convertFocused('h' + i) });
@@ -481,6 +545,14 @@ class App {
   }
 
   registerCoreSlashCommands() {
+    this.registry.registerSlashCommand({
+      id: 'core.todoDue', name: 'To-do mit Datum', icon: 'calendar', group: 'Listen', description: 'Aufgabe mit Fälligkeitsdatum (erscheint im Kalender)', keywords: ['datum', 'fällig', 'termin', 'deadline', 'kalender', 'todo', 'aufgabe', 'due'],
+      run: (editor, { blockId }) => { editor.focusBlock(blockId, 'end'); setTimeout(() => this.setDueForFocused(), 30); }
+    });
+    this.registry.registerSlashCommand({
+      id: 'core.quickNote', name: 'Schnellnotiz', icon: 'zap', group: 'Einfügen', description: 'Notiz mit Zeitstempel in deine Quicknotizen', keywords: ['schnell', 'quick', 'notiz', 'inbox'],
+      run: () => this.quickNote()
+    });
     this.registry.registerSlashCommand({
       id: 'core.draw', name: 'Zeichnen', icon: 'pen', group: 'Medien', description: 'Frei auf der Notiz zeichnen & markieren', keywords: ['zeichnen', 'malen', 'stift', 'marker', 'draw', 'markieren'],
       run: () => this.toggleDrawMode(true)
@@ -527,23 +599,6 @@ class App {
       ui: { h, icon, editable, htmlToMarkdown }
     };
   }
-}
-
-function shiftHue(hex, deg) {
-  const m = hex.replace('#', '').match(/.{2}/g);
-  if (!m) return hex;
-  let [r, g, b] = m.map((x) => parseInt(x, 16) / 255);
-  const max = Math.max(r, g, b), min = Math.min(r, g, b);
-  let hh = 0, s = 0;
-  const l = (max + min) / 2;
-  if (max !== min) {
-    const d = max - min;
-    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
-    hh = max === r ? (g - b) / d + (g < b ? 6 : 0) : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
-    hh *= 60;
-  }
-  hh = (hh + deg) % 360;
-  return `hsl(${Math.round(hh)} ${Math.round(s * 100)}% ${Math.round(l * 100)}%)`;
 }
 
 const app = new App();

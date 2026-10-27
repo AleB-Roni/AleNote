@@ -3,6 +3,9 @@ import { h, stripHtml } from '../core/utils.js';
 import { emojiPicker } from '../ui/pickers.js';
 import { contextMenu } from '../ui/overlays.js';
 import { BLOCK_COLORS } from '../ui/editor.js';
+import { icon } from '../ui/icons.js';
+import { datePicker } from '../ui/datepicker.js';
+import { dueLabel, dueState } from '../core/todos.js';
 
 /** Erstellt das Haupt-Textfeld eines Blocks */
 export function editable(block, { tag = 'div', field = 'text', placeholder = '', cls = '' } = {}) {
@@ -76,6 +79,20 @@ export default function registerTextBlocks(registry) {
     render(b, ctx) {
       const box = h('button.todo-check' + (b.data.checked ? '.checked' : ''), { title: 'Erledigt', html: '<svg viewBox="0 0 24 24" width="14" height="14"><path d="m5 12 5 5 9-10" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>' });
       const row = h('div.list-row.todo' + (b.data.checked ? '.done' : ''), {}, box, editable(b, { placeholder: 'Aufgabe' }));
+      // Fälligkeitsdatum (erscheint im Kalender)
+      const due = h('button.todo-due' + (b.data.due ? '.has.' + (dueState(b.data.due, b.data.checked) || 'later') : ''), {
+        title: b.data.due ? 'Fälligkeitsdatum ändern' : 'Fälligkeitsdatum festlegen',
+        contenteditable: 'false',
+        onmousedown: (e) => e.preventDefault(),
+        onclick: () => datePicker(due, { due: b.data.due, time: b.data.dueTime, onPick: (d, t) => {
+          Object.assign(b.data, { due: d, dueTime: t });
+          if (!d) { delete b.data.due; delete b.data.dueTime; }
+          ctx.editor.rerenderBlock(b.id, { focus: 'end' });
+          ctx.editor.changed(true);
+          ctx.app.events.emit('todos:change');
+        } })
+      }, icon('calendar', 13), b.data.due ? h('span', { text: dueLabel(b.data.due, b.data.dueTime) }) : null);
+      row.append(due);
       box.addEventListener('click', () => {
         const checked = !b.data.checked;
         ctx.update({ checked });
@@ -85,7 +102,7 @@ export default function registerTextBlocks(registry) {
       });
       return row;
     },
-    toMarkdown: (b) => '  '.repeat(b.indent || 0) + `- [${b.data.checked ? 'x' : ' '}] ` + htmlToMarkdown(b.data.text)
+    toMarkdown: (b) => '  '.repeat(b.indent || 0) + `- [${b.data.checked ? 'x' : ' '}] ` + htmlToMarkdown(b.data.text) + (b.data.due ? ` 📅 ${b.data.due}${b.data.dueTime ? ' ' + b.data.dueTime : ''}` : '')
   }));
 
   registry.registerBlock(textBlock({

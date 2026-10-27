@@ -1,7 +1,7 @@
 // AleNote – Electron Hauptprozess
 // Verwaltet Fenster, Dateisystem (Vault), Assets, Einstellungen und Plugins.
 
-const { app, BrowserWindow, ipcMain, dialog, shell, protocol, net } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell, protocol, net, globalShortcut, screen } = require('electron');
 const path = require('path');
 const fs = require('fs/promises');
 const { pathToFileURL } = require('url');
@@ -111,6 +111,7 @@ function createWindow() {
   });
   win.removeMenu();
   win.once('ready-to-show', () => win.show());
+  win.on('closed', () => { win = null; if (quickWin) quickWin.destroy(); });
   win.loadURL('alenote://app/index.html');
 
   // Externe Links im Standardbrowser öffnen
@@ -124,6 +125,62 @@ function createWindow() {
   win.webContents.on('before-input-event', (e, input) => {
     if (input.type === 'keyDown' && input.key === 'F12') win.webContents.toggleDevTools();
   });
+}
+
+// ---------- Schnellnotiz-Fenster (globale Tastenkombination) ----------
+let quickWin;
+let quickShortcut = '';
+
+/** "Ctrl+Alt+N" → Electron-Accelerator */
+function toAccelerator(sc) {
+  return String(sc || '').split('+').map((k) => ({ Ctrl: 'CommandOrControl', Meta: 'Super', Esc: 'Escape' }[k] || (/^Num\d$/.test(k) ? 'num' + k.slice(3) : k))).join('+');
+}
+
+function createQuickWindow() {
+  quickWin = new BrowserWindow({
+    width: 580, height: 270, show: false, frame: false, resizable: false, maximizable: false, minimizable: false,
+    alwaysOnTop: true, skipTaskbar: true, fullscreenable: false, backgroundColor: '#1b1b22', title: 'AleNote – Schnellnotiz',
+    icon: path.join(__dirname, 'assets', 'icon.png'),
+    webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false, spellcheck: true }
+  });
+  quickWin.removeMenu();
+  quickWin.loadURL('alenote://app/quick.html');
+  quickWin.on('blur', () => { if (!quickWin.webContents.isDevToolsOpened()) quickWin.hide(); });
+  quickWin.on('closed', () => { quickWin = null; });
+}
+
+function showQuickWindow() {
+  if (!quickWin) createQuickWindow();
+  // Auf dem Bildschirm öffnen, auf dem gerade die Maus ist
+  const area = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea;
+  const [w] = quickWin.getSize();
+  quickWin.setPosition(Math.round(area.x + (area.width - w) / 2), Math.round(area.y + area.height * 0.22));
+  const reveal = () => { quickWin.show(); quickWin.focus(); quickWin.webContents.send('quicknote:show'); };
+  if (quickWin.webContents.isLoading()) quickWin.webContents.once('did-finish-load', reveal); else reveal();
+}
+
+function registerQuickShortcut() {
+  const sc = settings.quicknote?.globalShortcut ?? 'Ctrl+Alt+Space';
+  if (sc === quickShortcut) return { ok: true };
+  if (quickShortcut) globalShortcut.unregister(toAccelerator(quickShortcut));
+  quickShortcut = '';
+  if (!sc) return { ok: true };
+  let ok = false;
+  try { ok = globalShortcut.register(toAccelerator(sc), showQuickWindow); } catch {}
+  if (ok) quickShortcut = sc;
+  return { ok, error: ok ? '' : `„${sc}“ wird bereits von einem anderen Programm verwendet` };
+}
+
+function registerQuickIpc() {
+  ipcMain.handle('quick:submit', (_e, entry) => { notify('quicknote:add', entry); return true; });
+  ipcMain.handle('quick:hide', () => quickWin?.hide());
+  ipcMain.handle('quick:resize', (_e, height) => {
+    if (!quickWin) return;
+    const [w] = quickWin.getSize();
+    quickWin.setSize(w, Math.max(200, Math.min(640, Math.round(height))));
+  });
+  ipcMain.handle('quick:shortcut', () => registerQuickShortcut());
+  ipcMain.handle('quick:open', () => showQuickWindow());
 }
 
 // ---------- Protokoll alenote:// ----------
@@ -248,7 +305,12 @@ function registerAccountIpc() {
 
 function registerIpc() {
   handle('settings:get', () => settings);
-  handle('settings:set', async (patch) => { Object.assign(settings, patch); await saveSettings(); return settings; });
+  handle('settings:set', async (patch) => {
+    Object.assign(settings, patch);
+    await saveSettings();
+    if ('quicknote' in patch) registerQuickShortcut();
+    return settings;
+  });
 
   handle('vault:get', () => vault);
   handle('vault:choose', async () => {
@@ -401,7 +463,10 @@ else {
     registerProtocol();
     registerIpc();
     registerAccountIpc();
+    registerQuickIpc();
     createWindow();
+    registerQuickShortcut();
   });
+  app.on('will-quit', () => globalShortcut.unregisterAll());
   app.on('window-all-closed', () => app.quit());
 }

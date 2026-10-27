@@ -68,7 +68,12 @@ export function mdToBlocks(md, editor) {
     let m;
     if ((m = t.match(/^(#{1,6})\s+(.*)$/))) { flush(); add('h' + Math.min(3, m[1].length), { text: mdInlineToHtml(m[2]) }); }
     else if (/^(-{3,}|\*{3,}|_{3,})$/.test(t)) { flush(); add('divider'); }
-    else if ((m = t.match(/^[-*+]\s+\[([ xX])\]\s+(.*)$/))) { flush(); add('todo', { text: mdInlineToHtml(m[2]), checked: m[1] !== ' ' }, indent ? { indent } : {}); }
+    else if ((m = t.match(/^[-*+]\s+\[([ xX])\]\s+(.*)$/))) {
+      flush();
+      const d = m[2].match(/\s*📅\s*(\d{4}-\d{2}-\d{2})(?:\s+(\d{1,2}:\d{2}))?\s*$/);
+      const text = d ? m[2].slice(0, d.index) : m[2];
+      add('todo', { text: mdInlineToHtml(text), checked: m[1] !== ' ', ...(d ? { due: d[1], ...(d[2] ? { dueTime: d[2].padStart(5, '0') } : {}) } : {}) }, indent ? { indent } : {});
+    }
     else if ((m = t.match(/^[-*+•]\s+(.*)$/))) { flush(); add('bullet', { text: mdInlineToHtml(m[1]) }, indent ? { indent } : {}); }
     else if ((m = t.match(/^\d+[.)]\s+(.*)$/))) { flush(); add('numbered', { text: mdInlineToHtml(m[1]) }, indent ? { indent } : {}); }
     else if ((m = t.match(/^>\s?(.*)$/))) {

@@ -42,8 +42,14 @@ contextBridge.exposeInMainWorld('alenoteNative', {
   updateStatus: call('update:get'),
   checkUpdate: call('update:check'),
   installUpdate: call('update:install'),
+  // Schnellnotiz-Fenster
+  quickSubmit: call('quick:submit'),
+  quickHide: call('quick:hide'),
+  quickResize: call('quick:resize'),
+  quickShortcutStatus: call('quick:shortcut'),
+  openQuickWindow: call('quick:open'),
   on: (channel, fn) => {
-    const allowed = ['sync:status', 'sync:changed', 'sync:conflicts', 'account:authLost', 'update:status'];
+    const allowed = ['sync:status', 'sync:changed', 'sync:conflicts', 'account:authLost', 'update:status', 'quicknote:add', 'quicknote:show'];
     if (!allowed.includes(channel)) return () => {};
     const listener = (_e, payload) => fn(payload);
     ipcRenderer.on(channel, listener);

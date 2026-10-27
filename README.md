@@ -83,6 +83,14 @@ Die portable EXE kann sich nicht selbst aktualisieren.
 - **Eigene Hotkeys** (siehe unten)
 - **Themes**: Dunkel, Mitternacht, OLED, Wald, Hell, Papier, Rosé, dazu Akzentfarbe, Schriftart, Größe, Seitenbreite, Fokus-Modus
 - **Rückgängig/Wiederholen** (Strg+Z / Strg+Y), automatisches Speichern
+- **KI-Assistent** (Claude, ChatGPT, Gemini, Mistral, Groq, DeepSeek, Grok, OpenRouter, Ollama, eigene OpenAI-kompatible Server):
+  - **Eigene Prompts** festlegen (Einstellungen → KI): Was soll die KI mit dem Text machen, für welchen Bereich (Auswahl, Block, ganze Seite), ob ersetzen oder darunter einfügen. Optional mit eigenem Kürzel, im „/“-Menü und in der Formatierungsleiste.
+  - **KI-Leiste** mit Strg+J, KI-Untermenü am ⋮⋮-Griff jedes Blocks, Vorschau vor dem Übernehmen, alles mit Strg+Z rückgängig.
+  - **Chat an der Seite** (✨ oben oder Strg+Shift+J), einklappbar, kennt auf Wunsch die geöffnete Notiz, Antworten lassen sich in die Notiz einfügen.
+  - API-Schlüssel bleiben nur auf dem Gerät und werden nicht synchronisiert.
+- **Schnellnotiz** (⚡ in der Seitenleiste, Strg+Shift+Space in AleNote, **Strg+Alt+Space überall in Windows**): kleines Fenster, Text eintippen, Enter. Der Eintrag landet mit Datum und Uhrzeit in „Quicknotizen“ oder einer frei wählbaren Notiz, auf Wunsch als To-do mit Fälligkeitsdatum. Einstellungen → Schnellnotiz.
+- **Fälligkeitsdatum für To-dos**: im To-do auf 📅 klicken, `/To-do mit Datum` oder Strg+Shift+T. Heute, Morgen oder Überfällig werden farbig markiert.
+- **Kalender** (Seitenleiste oder Strg+Alt+K): Monats- und Listenansicht mit allen To-dos des angemeldeten Benutzers. Abhaken, per Ziehen auf einen anderen Tag verschieben, Doppelklick auf einen Tag legt eine Aufgabe an, Klick öffnet die Notiz.
 - **Mitgelieferte Plugins**: Wortzähler, Markdown-Export, Tagesnotiz (Strg+Alt+N), Gliederung, Fortschrittsbalken
 
 ## Eigene Hotkeys
@@ -135,6 +143,10 @@ Voreingestellt sind: `Strg+Shift+D` Datum · `Strg+Shift+U` Uhrzeit · `Strg+Alt
 | Strg+Alt+T / Strg+Alt+L | In To-do / Aufzählung umwandeln |
 | Strg+Shift+E | Als Markdown exportieren |
 | Strg+Alt+N | Tagesnotiz |
+| Strg+J / Strg+Shift+J | KI-Befehl / KI-Chat |
+| Strg+Shift+Space | Schnellnotiz (global: Strg+Alt+Space) |
+| Strg+Alt+K | Kalender |
+| Strg+Shift+T | Fälligkeitsdatum festlegen |
 | F12 | Entwicklerwerkzeuge |
 
 ## Projektstruktur

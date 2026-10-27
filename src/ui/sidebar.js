@@ -2,6 +2,7 @@
 import { h } from '../core/utils.js';
 import { icon } from './icons.js';
 import { contextMenu, confirmDialog, toast } from './overlays.js';
+import { todoBadge } from './calendar.js';
 
 export class Sidebar {
   constructor(app, el) {
@@ -27,7 +28,12 @@ export class Sidebar {
     const quick = h('div.sidebar-quick', {},
       this.navButton('search', 'Suchen & Befehle', 'Ctrl+P', () => app.palette.open()),
       this.navButton('filePlus', 'Neue Notiz', 'Ctrl+N', () => app.createNote(this.contextFolder())),
-      this.navButton('folderPlus', 'Neuer Ordner', 'Ctrl+Shift+N', () => app.createFolder(this.contextFolder())));
+      this.navButton('folderPlus', 'Neuer Ordner', 'Ctrl+Shift+N', () => app.createFolder(this.contextFolder())),
+      this.navButton('zap', 'Schnellnotiz', app.hotkeys?.shortcutFor('core.quickNote') || '', () => app.quickNote()),
+      this.calBtn = this.navButton('calendar', 'Kalender', app.hotkeys?.shortcutFor('core.calendar') || '', () => app.openCalendar()));
+    this.calBtn.classList.add('nav-calendar');
+    this.calBadge = h('span.nav-badge');
+    this.calBtn.querySelector('.nav-kbd').before(this.calBadge);
 
     this.favEl = h('div.sidebar-section');
     this.panelsEl = h('div.sidebar-panels');
@@ -107,7 +113,22 @@ export class Sidebar {
     this.renderFavorites();
     this.renderPanels();
     this.app.events.emit('tree:change', this.tree);
+    this.updateBadge();
     return this.tree;
+  }
+
+  /** Zahl der heute fälligen bzw. überfälligen Aufgaben am Kalender-Knopf */
+  updateBadge() {
+    clearTimeout(this.badgeTimer);
+    this.badgeTimer = setTimeout(async () => {
+      try {
+        const { today, overdue } = await todoBadge(this.app);
+        const n = today + overdue;
+        this.calBadge.textContent = n ? String(n) : '';
+        this.calBadge.className = 'nav-badge' + (overdue ? ' overdue' : '');
+        this.calBadge.title = `${today} heute fällig · ${overdue} überfällig`;
+      } catch (err) { console.error(err); }
+    }, 400);
   }
 
   allNotes() {
