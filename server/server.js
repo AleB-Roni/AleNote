@@ -426,18 +426,61 @@ const WEB_VERSION = (() => {
   return 'web';
 })();
 
+/**
+ * Kennung des aktuellen Stands der Web-App (Version + Änderungszeiten aller Dateien).
+ * Die Dateien werden unter /app/v/<Kennung>/… ausgeliefert: Nach jedem Update ändern sich alle
+ * Adressen, der Browser kann alte und neue Dateien also nicht mischen (Safari-Cache!).
+ */
+let buildCache = { at: 0, id: '' };
+function webBuild() {
+  if (Date.now() - buildCache.at < 5000) return buildCache.id;
+  let h = 0;
+  const walk = (dir) => {
+    for (const e of fsSync.readdirSync(dir, { withFileTypes: true })) {
+      const p = path.join(dir, e.name);
+      if (e.isDirectory()) walk(p);
+      else { const st = fsSync.statSync(p); h = (h * 31 + Math.floor(st.mtimeMs) + st.size) % 2147483647; }
+    }
+  };
+  try { walk(WEB_DIR); } catch {}
+  buildCache = { at: Date.now(), id: `${WEB_VERSION}-${h.toString(36)}` };
+  return buildCache.id;
+}
+
 async function serveWeb(req, res, pathname) {
   if (!WEB_DIR) return send(res, 404, { error: 'Web-Version ist auf diesem Server nicht installiert' });
-  const rel = decodeURIComponent(pathname.replace(/^\/app\/?/, '')) || 'index.html';
-  if (rel === 'version.json') return send(res, 200, { version: WEB_VERSION });
+  let rel = decodeURIComponent(pathname.replace(/^\/app\/?/, '')) || 'index.html';
+  // Versionierte Adressen: /app/v/<Kennung>/datei → lange cachebar, weil sich die Adresse bei Updates ändert
+  let versioned = false, current = false;
+  const vm = rel.match(/^v\/([^/]+)\/(.*)$/);
+  if (vm) {
+    // Startseite unter alter/versionierter Adresse (z.B. ins Dock gelegte App) → zur normalen Startseite
+    if (!vm[2] || vm[2] === 'index.html') { res.writeHead(302, { Location: '../../', 'Cache-Control': 'no-store' }); return res.end(); }
+    rel = vm[2]; versioned = true; current = vm[1] === webBuild();
+  }
+  if (rel === 'version.json') return send(res, 200, { version: WEB_VERSION, build: webBuild() });
   const file = path.normalize(path.join(WEB_DIR, rel));
   if (!file.startsWith(WEB_DIR + path.sep)) return send(res, 403, { error: 'Verboten' });
   let stat;
   try { stat = await fs.stat(file); } catch { return send(res, 404, { error: 'Nicht gefunden' }); }
   if (!stat.isFile()) return send(res, 404, { error: 'Nicht gefunden' });
-  // Immer beim Server nachfragen (kein veralteter Cache nach Updates), unverändert → 304
+  const type = MIME[path.extname(file)] || 'application/octet-stream';
+
+  // Startseite: nie zwischenspeichern; alle Dateien über die versionierte Adresse laden (<base>)
+  if (rel === 'index.html' && !versioned) {
+    const html = (await fs.readFile(file, 'utf8'))
+      .replace('<head>', `<head>\n  <base href="v/${encodeURIComponent(webBuild())}/" />`)
+      // Manifest (installierte App) bleibt unter der festen Adresse, damit Start-Adresse und Bereich /app/ sind
+      .replace('href="manifest.webmanifest"', 'href="../../manifest.webmanifest"');
+    res.writeHead(200, { 'Content-Type': type, 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' });
+    return res.end(req.method === 'HEAD' ? undefined : html);
+  }
   const lastModified = stat.mtime.toUTCString();
-  const headers = { 'Content-Type': MIME[path.extname(file)] || 'application/octet-stream', 'Cache-Control': 'no-cache', 'Last-Modified': lastModified, 'X-Content-Type-Options': 'nosniff' };
+  const headers = {
+    'Content-Type': type, 'Last-Modified': lastModified, 'X-Content-Type-Options': 'nosniff',
+    // Nur der aktuelle Stand darf dauerhaft gecacht werden
+    'Cache-Control': versioned && current ? 'public, max-age=31536000, immutable' : 'no-cache'
+  };
   if (req.headers['if-modified-since'] === lastModified) { res.writeHead(304, headers); return res.end(); }
   res.writeHead(200, headers);
   if (req.method === 'HEAD') return res.end();
