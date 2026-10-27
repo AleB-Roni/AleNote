@@ -1123,3 +1123,8 @@ body.quick-window .quicknote :is(textarea, select, button, input, kbd), body.qui
   .cal-bar h2 { font-size: 16px; min-width: 0; flex: 1; }
   .qn-foot .muted.small { display: none; }
 }
+
+/* Startfehler (boot.js) */
+.boot-error { max-width: 640px; margin: 10vh auto; padding: 24px; color: var(--text); font-family: var(--font); user-select: text; }
+.boot-error h2 { margin: 0 0 8px; color: var(--c-red, #f27373); }
+.boot-error pre { white-space: pre-wrap; word-break: break-word; background: var(--bg-2); border: 1px solid var(--border); border-radius: 10px; padding: 12px; font-size: 12px; max-height: 50vh; overflow: auto; }
