@@ -21,7 +21,13 @@ export class InlineToolbar {
       btn('code', 'Inline-Code (Strg+E)', () => this.toggleCode()),
       h('div.tb-sep'),
       btn('link', 'Link (Strg+K)', () => this.link()),
-      btn('palette', 'Farbe', (b) => this.colors(b))
+      btn('palette', 'Farbe', (b) => this.colors(b)),
+      h('div.tb-sep'),
+      (() => {
+        const b = h('button.tb-btn.tb-ai', { title: 'KI (Strg+J)' }, icon('sparkles', 15), h('span', { text: 'KI' }));
+        b.addEventListener('mousedown', (e) => { e.preventDefault(); this.aiMenu(b); });
+        return b;
+      })()
     );
     this.colorPanel = null;
     document.body.append(this.el);
@@ -124,6 +130,22 @@ export class InlineToolbar {
     this.el.append(panel);
     this.colorPanel = panel;
     void anchor;
+  }
+
+  /** KI-Aktionen für den markierten Text */
+  aiMenu(anchor) {
+    const ai = this.editor.app.ai;
+    if (!ai) return;
+    const sel = window.getSelection();
+    const range = sel.rangeCount ? sel.getRangeAt(0).cloneRange() : null;
+    const target = ai.captureTarget('selection');
+    if (!target) return;
+    import('./overlays.js').then(({ contextMenu }) => contextMenu([
+      { header: 'KI · markierter Text' },
+      { label: 'Eigene Anweisung …', icon: 'sparkles', shortcut: 'Ctrl+J', run: () => { if (range) { sel.removeAllRanges(); sel.addRange(range); } ai.openCommandBar(); } },
+      '-',
+      ...ai.toolbarActions().map((a) => ({ label: `${a.icon || ''} ${a.name}`.trim(), run: () => ai.run(a, { target }) }))
+    ], anchor));
   }
 
   shortcuts(e) {

@@ -1,5 +1,6 @@
 // Einstellungen: Darstellung, Editor, Hotkeys, Plugins, Vault
 import { h } from '../core/utils.js';
+import { renderAISettings } from '../ai/ai-settings.js';
 import { icon } from './icons.js';
 import { modal, toast, confirmDialog } from './overlays.js';
 import { eventToShortcut, shortcutHtml } from '../core/shortcuts.js';
@@ -17,6 +18,7 @@ export function openSettings(app, tab = 'appearance') {
     ['appearance', 'Darstellung', 'palette'],
     ['editor', 'Editor', 'edit'],
     ['hotkeys', 'Hotkeys', 'keyboard'],
+    ['ai', 'KI', 'sparkles'],
     ['account', 'Konto & Sync', 'user'],
     ['plugins', 'Plugins', 'puzzle'],
     ['vault', 'Vault', 'vault'],
@@ -31,7 +33,7 @@ export function openSettings(app, tab = 'appearance') {
     nav.querySelectorAll('.settings-tab').forEach((b) => b.classList.toggle('active', b.dataset.tab === id));
     body.innerHTML = '';
     const page = h('div.settings-page');
-    ({ appearance, editor, hotkeys, account, plugins, vault, about })[id](app, page, () => show(id), m);
+    ({ appearance, editor, hotkeys, ai, account, plugins, vault, about })[id](app, page, () => show(id), m);
     body.append(page);
     body.scrollTop = 0;
   };
@@ -232,6 +234,10 @@ function hotkeys(app, page, rerender) {
   }
   page.append(table);
   page.append(h('p.muted.small', { html: 'Fest eingebaut: <kbd>Strg</kbd><kbd>B</kbd> Fett · <kbd>Strg</kbd><kbd>I</kbd> Kursiv · <kbd>Strg</kbd><kbd>U</kbd> Unterstrichen · <kbd>Strg</kbd><kbd>E</kbd> Code · <kbd>Strg</kbd><kbd>K</kbd> Link · <kbd>Strg</kbd><kbd>A</kbd> 1× Block, 2× alles · <kbd>Tab</kbd> Einrücken · <kbd>/</kbd> Befehle' }));
+}
+
+function ai(app, page, rerender) {
+  renderAISettings(app, page, rerender, { shortcutRecorder, toggle, select });
 }
 
 function account(app, page, rerender) {

@@ -18,6 +18,7 @@ import { welcomeNote } from './welcome.js';
 import { AccountUI } from './ui/account.js';
 import { UpdateUI } from './ui/updates.js';
 import { DrawToolbar } from './ui/drawing.js';
+import { AIManager } from './ai/ai.js';
 import { initMobile, isNarrow } from './core/mobile.js';
 
 class App {
@@ -54,6 +55,8 @@ class App {
     this.plugins = new PluginManager(this);
     await this.plugins.loadAll();
     this.hotkeys.syncCustomHotkeys();
+    this.ai = new AIManager(this);
+    this.ai.registerAll();
 
     this.account = new AccountUI(this);
     await this.account.init();
@@ -97,6 +100,7 @@ class App {
       h('div.flex.drag-region'),
       this.statusItems,
       this.statusEl,
+      h('button.icon-btn.ai-btn', { title: 'KI-Chat (Strg+Shift+J) · KI-Befehl: Strg+J', onclick: () => this.ai.chat.toggle() }, icon('sparkles', 17)),
       h('button.icon-btn.draw-btn', { title: 'Zeichnen (Strg+Alt+P)', onclick: () => this.toggleDrawMode() }, icon('pen', 17)),
       h('button.icon-btn.undo-btn', { title: 'Rückgängig (Strg+Z)', disabled: true, onmousedown: (e) => e.preventDefault(), onclick: () => this.editor.undo() }, icon('undo', 17)),
       h('button.icon-btn.redo-btn', { title: 'Wiederholen (Strg+Y)', disabled: true, onmousedown: (e) => e.preventDefault(), onclick: () => this.editor.redo() }, icon('redo', 17)),

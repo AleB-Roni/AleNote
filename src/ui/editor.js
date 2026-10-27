@@ -995,6 +995,7 @@ export class Editor {
         ...BLOCK_COLORS.filter((c) => c.id).map((c) => ({ label: c.name, swatch: `var(--bg-${c.id})`, active: b.color === 'bg-' + c.id, run: () => this.setColor(id, 'bg-' + c.id) }))
       ] },
       '-',
+      ...(this.app.ai ? [{ label: 'KI', icon: 'sparkles', submenu: this.app.ai.blockMenuItems(id) }] : []),
       { label: 'Duplizieren', icon: 'copy', shortcut: 'Ctrl+D', run: () => this.duplicateBlock(id) },
       { label: 'Nach oben', icon: 'chevronUp', run: () => { const i = this.index(id); if (i > 0) this.moveBlock(id, i - 1); } },
       { label: 'Nach unten', icon: 'chevronDown', run: () => { const i = this.index(id); if (i < this.note.blocks.length - 1) this.moveBlock(id, i + 2); } },
