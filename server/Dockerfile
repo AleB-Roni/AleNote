@@ -1,15 +1,19 @@
 FROM node:22-alpine
 
 LABEL org.opencontainers.image.title="AleNote Server" \
-      org.opencontainers.image.description="Sync-Server für AleNote mit Benutzerverwaltung und Admin-Konsole" \
+      org.opencontainers.image.description="Sync-Server für AleNote mit Benutzerverwaltung, Admin-Konsole und Web-Version" \
       org.opencontainers.image.source="https://github.com/AleB-Roni/AleNote" \
       org.opencontainers.image.licenses="MIT"
 
+# Wird aus dem Hauptordner des Repositorys gebaut:  docker build -f server/Dockerfile .
 WORKDIR /app
-COPY package.json server.js ./
-COPY lib ./lib
-COPY admin ./admin
-COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+COPY server/package.json server/server.js ./
+COPY server/lib ./lib
+COPY server/admin ./admin
+# Web-Version (AleNote im Browser unter /app/) + deren Versionsnummer
+COPY src ./web
+COPY package.json ./app-package.json
+COPY server/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
 ENV PORT=8787 \

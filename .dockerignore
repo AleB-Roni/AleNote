@@ -1,0 +1,7 @@
+# Docker-Build (server/Dockerfile) braucht nur Server, Web-App und package.json
+*
+!server/
+!src/
+!package.json
+server/data
+server/node_modules

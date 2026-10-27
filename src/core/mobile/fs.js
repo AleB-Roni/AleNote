@@ -1,6 +1,7 @@
 // Dateisystem für die Handy-App
 // - CapacitorFs: echter App-Speicher auf Android (Capacitor Filesystem, Bereich DATA)
-// - MemoryFs:    Simulation im Browser (zum Testen ohne Handy)
+// - MemoryFs:    Simulation im Browser (zum Testen ohne Handy, localStorage)
+// - IdbFs:       Web-Version im Browser (IndexedDB, genug Platz auch für Bilder)
 // Alle Pfade sind relativ und mit "/" getrennt.
 
 const norm = (p) => String(p || '').replace(/^\/+|\/+$/g, '');
@@ -47,10 +48,13 @@ export class MemoryFs {
     this.dirs = new Set(Object.keys(this.files).flatMap((p) => p.split('/').slice(0, -1).map((_, i, a) => a.slice(0, i + 1).join('/'))));
   }
   persist() { try { localStorage.setItem(this.key, JSON.stringify(this.files)); } catch {} }
+  // Hooks für Unterklassen: einzelne Dateien/Ordner geändert
+  put() { this.persist(); }
+  del() { this.persist(); }
   async readText(p) { p = norm(p); if (!(p in this.files)) throw new Error('Nicht gefunden: ' + p); return this.files[p]; }
   async readBase64(p) { return btoa(unescape(encodeURIComponent(await this.readText(p)))); }
-  async writeText(p, t) { p = norm(p); this.files[p] = t; await this.mkdir(parentOf(p)); this.persist(); }
-  async writeBase64(p, b64) { p = norm(p); this.files[p] = 'data:;base64,' + b64; await this.mkdir(parentOf(p)); this.persist(); }
+  async writeText(p, t) { p = norm(p); this.files[p] = t; await this.mkdir(parentOf(p)); this.put(p); }
+  async writeBase64(p, b64) { p = norm(p); this.files[p] = 'data:;base64,' + b64; await this.mkdir(parentOf(p)); this.put(p); }
   async list(p) {
     p = norm(p);
     const out = new Map();
@@ -61,27 +65,91 @@ export class MemoryFs {
   }
   async exists(p) { p = norm(p); return p in this.files || this.dirs.has(p); }
   async isDir(p) { return this.dirs.has(norm(p)); }
-  async mkdir(p) { p = norm(p); if (!p) return; const parts = p.split('/'); parts.forEach((_, i) => this.dirs.add(parts.slice(0, i + 1).join('/'))); }
+  async mkdir(p) {
+    p = norm(p);
+    if (!p) return;
+    const before = this.dirs.size;
+    const parts = p.split('/');
+    parts.forEach((_, i) => this.dirs.add(parts.slice(0, i + 1).join('/')));
+    if (this.dirs.size !== before) this.dirsChanged?.();
+  }
   async rmdir(p, recursive = false) {
     p = norm(p);
     const inside = Object.keys(this.files).filter((f) => f.startsWith(p + '/'));
     if (inside.length && !recursive) return;
     inside.forEach((f) => delete this.files[f]);
     for (const d of [...this.dirs]) if (d === p || d.startsWith(p + '/')) this.dirs.delete(d);
-    this.persist();
+    this.dirsChanged?.();
+    this.del(inside);
   }
-  async remove(p) { delete this.files[norm(p)]; this.persist(); }
+  async remove(p) { p = norm(p); delete this.files[p]; this.del([p]); }
   async rename(from, to) {
     from = norm(from); to = norm(to);
-    for (const f of Object.keys(this.files)) if (f === from || f.startsWith(from + '/')) { this.files[to + f.slice(from.length)] = this.files[f]; delete this.files[f]; }
+    const moved = [];
+    for (const f of Object.keys(this.files)) if (f === from || f.startsWith(from + '/')) { const t = to + f.slice(from.length); this.files[t] = this.files[f]; delete this.files[f]; moved.push([f, t]); }
     for (const d of [...this.dirs]) if (d === from || d.startsWith(from + '/')) { this.dirs.delete(d); this.dirs.add(to + d.slice(from.length)); }
     await this.mkdir(parentOf(to));
-    this.persist();
+    if (moved.length) { this.del(moved.map(([f]) => f)); moved.forEach(([, t]) => this.put(t)); } else this.persist();
   }
-  async copy(from, to) { this.files[norm(to)] = this.files[norm(from)]; this.persist(); }
+  async copy(from, to) { this.files[norm(to)] = this.files[norm(from)]; this.put(norm(to)); }
   async fileUrlBase() { return null; }
   dataUrl(p) { const v = this.files[norm(p)]; return v && v.startsWith('data:') ? v.replace('data:;', 'data:image/*;') : null; }
 }
+
+/**
+ * Web-Version: Dateien liegen in der IndexedDB des Browsers.
+ * Beim Start wird alles in den Speicher geladen (schnelles Lesen), jede Änderung wird einzeln gespeichert.
+ */
+export class IdbFs extends MemoryFs {
+  static async open(name = 'alenote-web') {
+    const db = await new Promise((res, rej) => {
+      const r = indexedDB.open(name, 1);
+      r.onupgradeneeded = () => r.result.createObjectStore('files');
+      r.onsuccess = () => res(r.result);
+      r.onerror = () => rej(r.error || new Error('Browser-Speicher (IndexedDB) nicht verfügbar'));
+    });
+    const files = {};
+    let dirs = [];
+    await new Promise((res, rej) => {
+      const req = db.transaction('files').objectStore('files').openCursor();
+      req.onsuccess = () => {
+        const c = req.result;
+        if (!c) return res();
+        if (c.key === DIRS_KEY) dirs = c.value || []; else files[c.key] = c.value;
+        c.continue();
+      };
+      req.onerror = () => rej(req.error);
+    });
+    const fs = new IdbFs(db, files, dirs);
+    navigator.storage?.persist?.().catch(() => {}); // Browser soll die Daten nicht automatisch löschen
+    return fs;
+  }
+
+  constructor(db, files, dirs) {
+    super('__unused__');
+    this.db = db;
+    this.files = files;
+    this.dirs = new Set([...dirs, ...Object.keys(files).flatMap((p) => p.split('/').slice(0, -1).map((_, i, a) => a.slice(0, i + 1).join('/')))]);
+    this.queue = Promise.resolve();
+  }
+
+  tx(fn) {
+    this.queue = this.queue.then(() => new Promise((res) => {
+      const t = this.db.transaction('files', 'readwrite');
+      fn(t.objectStore('files'));
+      t.oncomplete = res;
+      t.onerror = t.onabort = () => { console.error('IndexedDB', t.error); res(); };
+    }));
+    return this.queue;
+  }
+  persist() {}
+  put(p) { const v = this.files[p]; return this.tx((s) => s.put(v, p)); }
+  del(list) { return this.tx((s) => list.forEach((p) => s.delete(p))); }
+  dirsChanged() { const v = [...this.dirs]; this.tx((s) => s.put(v, DIRS_KEY)); }
+  /** Wartet, bis alle Änderungen gespeichert sind */
+  flush() { return this.queue; }
+}
+const DIRS_KEY = '\u0000dirs';
 
 function blobToBase64(blob) {
   return new Promise((res) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(',')[1]); r.readAsDataURL(blob); });

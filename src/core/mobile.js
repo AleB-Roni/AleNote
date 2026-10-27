@@ -6,6 +6,7 @@ export const isNarrow = () => matchMedia('(max-width: 760px)').matches;
 export function initMobile(app) {
   const api = app.api;
   if (api.isMobile) document.body.classList.add('is-mobile');
+  if (api.isWeb) document.body.classList.add('is-web');
   if (matchMedia('(pointer: coarse)').matches) document.body.classList.add('touch');
 
   // Hintergrund zum Schließen der Seitenleiste

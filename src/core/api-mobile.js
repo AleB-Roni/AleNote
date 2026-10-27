@@ -1,8 +1,8 @@
-// AleNote auf dem Handy (Android/Capacitor)
+// AleNote auf dem Handy (Android/Capacitor) und als Web-Version im Browser
 // Bietet dieselbe Schnittstelle wie die Desktop-Brücke (preload.js), damit die gesamte
 // Oberfläche unverändert läuft: Notizen, Ordner, Bilder, Konto, Synchronisierung, Updates.
 
-import { CapacitorFs, MemoryFs, norm, parentOf } from './mobile/fs.js';
+import { CapacitorFs, MemoryFs, IdbFs, norm, parentOf } from './mobile/fs.js';
 import { MobileSync } from './mobile/sync-core.js';
 
 const NOTE_EXT = '.alenote';
@@ -36,7 +36,36 @@ for (const m of ['readText', 'readBase64', 'writeText', 'writeBase64', 'list', '
 PrefixFs.prototype.rename = function (a, b) { return this.fs.rename(this.p(a), this.p(b)); };
 PrefixFs.prototype.copy = function (a, b) { return this.fs.copy(this.p(a), this.p(b)); };
 
-export async function createMobileApi() {
+/**
+ * Web-Version: nur ein Browser-Tab darf gleichzeitig mit den lokalen Daten arbeiten.
+ * Ist AleNote schon in einem anderen Tab offen, wartet dieser Tab (oder übernimmt auf Wunsch).
+ */
+async function claimTab() {
+  if (!navigator.locks) return;
+  const lost = () => {
+    const box = document.createElement('div');
+    box.className = 'tab-lock';
+    box.innerHTML = '<div><h2>AleNote ist jetzt in einem anderen Tab geöffnet</h2><p>Damit nichts doppelt gespeichert wird, ist dieser Tab pausiert.</p><button class="btn btn-primary">Hier weiterarbeiten</button></div>';
+    box.querySelector('button').addEventListener('click', () => location.reload());
+    document.body.append(box);
+  };
+  const hold = (steal) => new Promise((resolve) => {
+    navigator.locks.request('alenote-web-tab', steal ? { steal: true } : { ifAvailable: true }, (lock) => {
+      resolve(!!lock);
+      return lock ? new Promise(() => {}) : undefined; // Sperre bis zum Schließen des Tabs halten
+    }).catch(() => lost()); // ein anderer Tab hat übernommen
+  });
+  if (await hold(false)) return;
+  // Schon offen: Hinweis zeigen, auf Wunsch übernehmen
+  await new Promise((resolve) => {
+    const app = document.getElementById('app');
+    document.body.classList.add('boot-failed');
+    app.innerHTML = '<div class="tab-lock"><div><h2>AleNote ist bereits in einem anderen Tab geöffnet</h2><p>Arbeite dort weiter oder öffne AleNote hier – der andere Tab wird dann pausiert.</p><button class="btn btn-primary">Hier öffnen</button></div></div>';
+    app.querySelector('button').addEventListener('click', async () => { await hold(true); app.innerHTML = ''; document.body.classList.remove('boot-failed'); resolve(); });
+  });
+}
+
+export async function createMobileApi({ web = false } = {}) {
   const native = !!window.Capacitor?.isNativePlatform?.();
   let Plugins = {};
   let fs;
@@ -49,6 +78,9 @@ export async function createMobileApi() {
       ApkInstaller: core.registerPlugin('ApkInstaller')
     };
     fs = new CapacitorFs(Plugins.Filesystem, core.Capacitor);
+  } else if (web) {
+    await claimTab();
+    fs = await IdbFs.open(); // Web-Version: Browser-Datenbank
   } else {
     fs = new MemoryFs(); // Simulation im Browser
   }
@@ -130,8 +162,11 @@ export async function createMobileApi() {
   const publicAccount = () => (settings.account ? (({ token, ...rest }) => rest)(settings.account) : null);
 
   // ---------- Updates ----------
-  const appInfo = native ? await Plugins.App.getInfo().catch(() => ({ version: '0.0.0' })) : { version: 'dev' };
-  let update = { state: native ? 'idle' : 'unsupported', version: appInfo.version, platform: 'android' };
+  const appInfo = native ? await Plugins.App.getInfo().catch(() => ({ version: '0.0.0' }))
+    : web ? await fetch('version.json', { cache: 'no-store' }).then((r) => r.json()).catch(() => ({ version: 'web' }))
+    : { version: 'dev' };
+  // Die Web-Version ist immer aktuell: sie kommt bei jedem Öffnen frisch vom Server
+  let update = { state: native ? 'idle' : 'unsupported', version: appInfo.version, platform: web ? 'web' : 'android' };
   const setUpdate = (patch) => { update = { ...update, ...patch }; notify('update:status', update); };
   let pendingInstall = null;
   if (native) {
@@ -203,9 +238,12 @@ export async function createMobileApi() {
 
   // ---------- Öffentliche Schnittstelle (wie preload.js) ----------
   return {
-    platform: 'android',
-    isMobile: true,
+    platform: web ? 'web' : 'android',
+    isMobile: !web,
+    isWeb: web,
     native,
+    /** Web-Version: der Server, von dem die Seite kommt */
+    defaultServer: web ? location.origin : '',
     plugins: Plugins,
 
     resolveSrc(src) {
@@ -217,7 +255,7 @@ export async function createMobileApi() {
 
     getSettings: async () => settings,
     setSettings: async (patch) => { Object.assign(settings, patch); await saveSettings(); return settings; },
-    getVault: async () => (settings.account ? `${settings.account.username}@${settings.account.serverName}` : 'Auf diesem Handy'),
+    getVault: async () => (settings.account ? `${settings.account.username}@${settings.account.serverName}` : web ? 'In diesem Browser' : 'Auf diesem Handy'),
     chooseVault: async () => null,
     revealInExplorer: async () => {},
     openFolder: async () => {},
@@ -320,7 +358,8 @@ export async function createMobileApi() {
     probeServer: async (server) => serverCall(normalizeServer(server), 'GET', '/api/health'),
     login: async ({ server, username, password, register, displayName }) => {
       server = normalizeServer(server);
-      const r = await serverCall(server, 'POST', register ? '/api/register' : '/api/login', { username, password, displayName, device: 'AleNote Android' });
+      const device = web ? `AleNote Web (${/Mac/.test(navigator.platform) ? 'Mac' : /Win/.test(navigator.platform) ? 'Windows' : 'Browser'})` : 'AleNote Android';
+      const r = await serverCall(server, 'POST', register ? '/api/register' : '/api/login', { username, password, displayName, device });
       const host = new URL(server).host.replace(/[^\w.-]/g, '_');
       sync.stop();
       settings.account = {

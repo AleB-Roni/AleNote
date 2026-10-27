@@ -38,8 +38,8 @@ label { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color:
 .side { width: 240px; flex-shrink: 0; background: var(--bg-2); border-right: 1px solid var(--border); display: flex; flex-direction: column; padding: 14px 10px; position: sticky; top: 0; height: 100vh; }
 .brand { display: flex; align-items: center; gap: 10px; padding: 4px 10px 18px; font-weight: 700; }
 nav { display: flex; flex-direction: column; gap: 2px; }
-nav button { text-align: left; height: 38px; padding: 0 12px; border: 0; border-radius: 9px; background: none; color: var(--text-2); transition: background .12s, color .12s; }
-nav button:hover { background: var(--hover); color: var(--text); }
+nav button, nav .nav-link { text-align: left; display: flex; align-items: center; text-decoration: none; font-size: inherit; height: 38px; padding: 0 12px; border: 0; border-radius: 9px; background: none; color: var(--text-2); transition: background .12s, color .12s; }
+nav button:hover, nav .nav-link:hover { background: var(--hover); color: var(--text); }
 nav button.active { background: rgba(124,92,255,.16); color: var(--text); }
 .side-foot { margin-top: auto; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px; border-top: 1px solid var(--border); }
 .me { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

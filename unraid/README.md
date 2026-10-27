@@ -35,6 +35,12 @@ wget -O /boot/config/plugins/dockerMan/templates-user/my-AleNote-Server.xml \
 
 In AleNote unten links auf **Anmelden** klicken. Als Server-Adresse `http://<Unraid-IP>:8787` eintragen, z.B. `http://192.168.1.10:8787`.
 
+### 5. AleNote im Browser (Mac, Linux, jeder PC)
+
+Der Container enthält auch eine **Web-Version**: `http://<Unraid-IP>:8787/app/` öffnen (auch über die Admin-Konsole → „AleNote im Browser“) und mit deinem Konto anmelden.
+Die Notizen werden im Browser gespeichert und automatisch mit dem Server abgeglichen, genau wie in der Windows- und Handy-App.
+Auf dem Mac lässt sie sich wie ein Programm ins Dock legen: Safari → **Ablage → Zum Dock hinzufügen** (Chrome: ⋮ → **Streamen, speichern und teilen → Seite als App installieren**).
+
 ## Update
 
 Docker-Tab → **Check for Updates** → **apply update**.

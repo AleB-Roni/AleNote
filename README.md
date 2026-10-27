@@ -1,6 +1,6 @@
 # AleNote
 
-Moderne, erweiterbare Notiz-App für Windows im Stil von Obsidian und Notion.
+Moderne, erweiterbare Notiz-App für Windows, Android und den Browser (z.B. auf dem Mac) im Stil von Obsidian und Notion.
 Basiert auf Electron und reinem JavaScript, ohne Build-Schritt. Jede Datei kann direkt bearbeitet werden.
 
 ![AleNote](docs/screenshots/2-Freie-Bilder-Tabelle-Todos.png)
@@ -25,6 +25,15 @@ Bei einem Tag wie `v1.0.0` landet sie zusätzlich unter **Releases**.
 
 Notizen liegen als Dateien im **Vault** (Standard: `Dokumente\AleNote`). Ordner in der App sind echte Ordner auf der Festplatte.
 Bilder landen in `_assets`. Plugins liegen in `.alenote\plugins`.
+
+## Web-Version (Mac & jeder Browser)
+
+Der AleNote-Server (Docker/Unraid oder `start-server.bat`) liefert AleNote auch als Web-App aus: **`http://<Server>:8787/app/`**.
+- Gleiche Oberfläche und Funktionen wie die Windows-App, mit Anmeldung am Server und automatischer Synchronisierung.
+- Notizen werden im Browser gespeichert (IndexedDB) und funktionieren auch kurz ohne Verbindung.
+- Auf dem Mac gelten ⌘-Kürzel statt Strg. Als App ins Dock: Safari → Ablage → **Zum Dock hinzufügen**.
+- Die Web-Version ist immer aktuell, sie kommt beim Öffnen frisch vom Server.
+- Nicht im Browser verfügbar: globale Schnellnotiz-Tastenkombination und eigene Plugin-Ordner. Einige Kürzel wie Strg/⌘+N oder Strg/⌘+W reserviert der Browser.
 
 ## Server, Konten & Synchronisierung
 

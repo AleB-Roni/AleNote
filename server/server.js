@@ -379,7 +379,11 @@ route('PUT', '/api/admin/updates/file/:name', async (req, ctx, q, params) => {
 
 // ================= Statische Admin-Konsole =================
 
-const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png' };
+const MIME = {
+  '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json; charset=utf-8',
+  '.webmanifest': 'application/manifest+json', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.webp': 'image/webp', '.gif': 'image/gif',
+  '.ico': 'image/x-icon', '.woff2': 'font/woff2'
+};
 async function serveAdmin(res, pathname) {
   const base = path.join(__dirname, 'admin');
   let rel = pathname.replace(/^\/admin\/?/, '') || 'index.html';
@@ -390,6 +394,36 @@ async function serveAdmin(res, pathname) {
     res.writeHead(200, { 'Content-Type': MIME[path.extname(file)] || 'application/octet-stream', 'Cache-Control': 'no-cache', 'X-Frame-Options': 'DENY' });
     res.end(buf);
   } catch { send(res, 404, { error: 'Nicht gefunden' }); }
+}
+
+// ================= Web-Version (AleNote im Browser) =================
+// Docker: /app/web · aus dem Repository gestartet: ../src
+const fsSync = require('fs');
+const WEB_DIR = [process.env.WEB_DIR, path.join(__dirname, 'web'), path.join(__dirname, '..', 'src')]
+  .filter(Boolean).map((d) => path.resolve(d)).find((d) => fsSync.existsSync(path.join(d, 'index.html')) && fsSync.existsSync(path.join(d, 'app.js')));
+const WEB_VERSION = (() => {
+  for (const f of [path.join(__dirname, 'app-package.json'), path.join(__dirname, '..', 'package.json')]) {
+    try { return JSON.parse(fsSync.readFileSync(f, 'utf8')).version; } catch {}
+  }
+  return 'web';
+})();
+
+async function serveWeb(req, res, pathname) {
+  if (!WEB_DIR) return send(res, 404, { error: 'Web-Version ist auf diesem Server nicht installiert' });
+  const rel = decodeURIComponent(pathname.replace(/^\/app\/?/, '')) || 'index.html';
+  if (rel === 'version.json') return send(res, 200, { version: WEB_VERSION });
+  const file = path.normalize(path.join(WEB_DIR, rel));
+  if (!file.startsWith(WEB_DIR + path.sep)) return send(res, 403, { error: 'Verboten' });
+  let stat;
+  try { stat = await fs.stat(file); } catch { return send(res, 404, { error: 'Nicht gefunden' }); }
+  if (!stat.isFile()) return send(res, 404, { error: 'Nicht gefunden' });
+  // Immer beim Server nachfragen (kein veralteter Cache nach Updates), unverändert → 304
+  const lastModified = stat.mtime.toUTCString();
+  const headers = { 'Content-Type': MIME[path.extname(file)] || 'application/octet-stream', 'Cache-Control': 'no-cache', 'Last-Modified': lastModified, 'X-Content-Type-Options': 'nosniff' };
+  if (req.headers['if-modified-since'] === lastModified) { res.writeHead(304, headers); return res.end(); }
+  res.writeHead(200, headers);
+  if (req.method === 'HEAD') return res.end();
+  res.end(await fs.readFile(file));
 }
 
 // ================= HTTP-Server =================
@@ -406,7 +440,9 @@ const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://localhost');
   const pathname = url.pathname;
   try {
-    if (pathname === '/' ) { res.writeHead(302, { Location: '/admin/' }); return res.end(); }
+    if (pathname === '/') { res.writeHead(302, { Location: WEB_DIR ? '/app/' : '/admin/' }); return res.end(); }
+    if (pathname === '/app') { res.writeHead(301, { Location: '/app/' }); return res.end(); }
+    if (pathname.startsWith('/app/') && (req.method === 'GET' || req.method === 'HEAD')) return await serveWeb(req, res, pathname);
     if (pathname === '/admin' || pathname.startsWith('/admin/')) return await serveAdmin(res, pathname);
     if (pathname.startsWith('/updates/') && (req.method === 'GET' || req.method === 'HEAD')) return await updates.serve(req, res, decodeURIComponent(pathname.slice(9)));
     if (pathname === '/api/health') {

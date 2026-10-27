@@ -9,7 +9,7 @@
   <Privileged>false</Privileged>
   <Support>https://github.com/AleB-Roni/AleNote/issues</Support>
   <Project>https://github.com/AleB-Roni/AleNote</Project>
-  <Overview>Sync-Server für AleNote – die erweiterbare Notiz-App. Mehrere Benutzer mit eigenem Speicher, Web-Admin-Konsole (Benutzer anlegen, Kontingente, Sitzungen, Einstellungen) und automatische Synchronisierung zwischen Desktop-App und künftiger Handy-App.[br][br]Beim ersten Start wird ein Admin-Konto angelegt. Ist kein Admin-Passwort gesetzt, steht ein zufälliges Passwort im Container-Log.</Overview>
+  <Overview>Sync-Server für AleNote – die erweiterbare Notiz-App. Mehrere Benutzer mit eigenem Speicher, Web-Admin-Konsole (Benutzer anlegen, Kontingente, Sitzungen, Einstellungen) und automatische Synchronisierung zwischen Windows-App, Android-App und Web-Version (im Browser unter http://UNRAID-IP:8787/app/ – ideal für Mac).[br][br]Beim ersten Start wird ein Admin-Konto angelegt. Ist kein Admin-Passwort gesetzt, steht ein zufälliges Passwort im Container-Log.</Overview>
   <Category>Productivity: Tools: Network:Web</Category>
   <WebUI>http://[IP]:[PORT:8787]/admin/</WebUI>
   <TemplateURL>https://raw.githubusercontent.com/AleB-Roni/AleNote/main/unraid/alenote-server.xml</TemplateURL>

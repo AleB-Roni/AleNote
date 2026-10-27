@@ -87,9 +87,11 @@ function createBrowserFallback() {
 // Zum Testen der Handy-Version im Browser: index.html?mobile
 const isCapacitor = !!window.Capacitor?.isNativePlatform?.();
 const simulateMobile = new URLSearchParams(location.search).has('mobile');
+// Web-Version: vom AleNote-Server unter /app/ ausgeliefert (zum Testen: index.html?web)
+const isWeb = !window.alenoteNative && !isCapacitor && (location.pathname.startsWith('/app/') || new URLSearchParams(location.search).has('web'));
 
 export const api = window.alenoteNative
-  || (isCapacitor || simulateMobile ? await (await import('./api-mobile.js')).createMobileApi() : createBrowserFallback());
+  || (isCapacitor || simulateMobile || isWeb ? await (await import('./api-mobile.js')).createMobileApi({ web: isWeb }) : createBrowserFallback());
 
 /** Bildquelle für die Anzeige umwandeln (alenote://asset/… auf dem Handy) */
 export const resolveSrc = (src) => (api.resolveSrc ? api.resolveSrc(src) : src);

@@ -1,0 +1,14 @@
+{
+  "name": "AleNote",
+  "short_name": "AleNote",
+  "description": "Notizen mit Ordnern, Blöcken, KI, Kalender und Synchronisierung",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#17171c",
+  "theme_color": "#17171c",
+  "lang": "de",
+  "icons": [
+    { "src": "app-icon.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ]
+}

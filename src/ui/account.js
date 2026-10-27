@@ -52,6 +52,10 @@ export class AccountUI {
       this.api.accountInfo().then((info) => { if (info?.motd) toast('📢 ' + info.motd, { duration: 6000 }); }).catch(() => {});
     }
     window.addEventListener('focus', () => { if (this.account) this.api.syncNow(); });
+    // Web-Version: beim ersten Öffnen gleich anmelden (sonst liegen die Notizen nur in diesem Browser)
+    if (this.api.isWeb && !this.account && !this.app.settings.webLocalOnly) {
+      setTimeout(() => this.loginDialog({ web: true }), 300);
+    }
   }
 
   // ---------------- Anzeige ----------------
@@ -96,7 +100,7 @@ export class AccountUI {
 
   // ---------------- Anmelden ----------------
 
-  loginDialog({ server = this.app.settings.lastServer || '', username = '', relogin = false } = {}) {
+  loginDialog({ server = this.app.settings.lastServer || this.api.defaultServer || '', username = '', relogin = false, web = false } = {}) {
     let registerMode = false;
     let serverInfo = null;
     const serverIn = h('input.input', { value: server, placeholder: 'z.B. http://192.168.1.20:8787', spellcheck: 'false' });
@@ -137,14 +141,16 @@ export class AccountUI {
       h('div.login-hero', {}, icon('cloud', 26), h('div', {},
         h('div.login-title', { text: relogin ? 'Sitzung abgelaufen' : 'Bei AleNote-Server anmelden' }),
         h('div.muted.small', { text: 'Notizen werden lokal gespeichert und automatisch mit dem Server abgeglichen – auch für die Handy-App.' }))),
-      h('label.login-field', {}, h('span', { text: 'Server-Adresse' }), serverIn), info,
+      h('label.login-field' + (web ? '.hidden' : ''), {}, h('span', { text: 'Server-Adresse' }), serverIn), info,
       h('label.login-field', {}, h('span', { text: 'Benutzername' }), userIn),
       nameRow,
       h('label.login-field', {}, h('span', { text: 'Passwort' }), passIn),
       err,
-      h('div.login-actions', {}, toggle, h('div.flex'), submit));
+      h('div.login-actions', {}, toggle, h('div.flex'), submit),
+      web ? h('button.link-btn.login-local', { type: 'button', text: 'Ohne Konto nur in diesem Browser nutzen', onclick: () => { this.app.saveSettings({ webLocalOnly: true }); m.close(); } }) : null);
 
-    const m = modal({ title: '', content: form, width: 440, className: 'login-modal' });
+    let m;
+    m = modal({ title: '', content: form, width: 440, className: 'login-modal' });
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       err.textContent = '';

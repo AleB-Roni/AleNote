@@ -3,7 +3,7 @@ name: Server-Docker-Image
 on:
   push:
     branches: [main]
-    paths: ['server/**', '.github/workflows/docker.yml']
+    paths: ['server/**', 'src/**', 'package.json', '.github/workflows/docker.yml']
     tags: ['v*']
   workflow_dispatch:
 
@@ -43,7 +43,8 @@ jobs:
       - name: Image bauen und veröffentlichen (amd64 + arm64)
         uses: docker/build-push-action@v6
         with:
-          context: server
+          context: .
+          file: server/Dockerfile
           platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.meta.outputs.tags }}

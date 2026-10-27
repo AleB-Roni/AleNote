@@ -3,6 +3,7 @@ import { h } from '../core/utils.js';
 import { icon } from './icons.js';
 import { contextMenu, confirmDialog, toast } from './overlays.js';
 import { todoBadge } from './calendar.js';
+import { shortcutText } from '../core/shortcuts.js';
 
 export class Sidebar {
   constructor(app, el) {
@@ -81,7 +82,7 @@ export class Sidebar {
   }
 
   navButton(ic, label, shortcut, run) {
-    return h('button.nav-btn', { onclick: run }, icon(ic, 16), h('span', { text: label }), h('span.nav-kbd', { text: shortcut.replace('Ctrl', 'Strg') }));
+    return h('button.nav-btn', { onclick: run }, icon(ic, 16), h('span', { text: label }), h('span.nav-kbd', { text: shortcutText(shortcut) }));
   }
 
   startResize(e) {
