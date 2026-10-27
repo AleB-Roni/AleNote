@@ -4,7 +4,7 @@ import { EventBus } from './core/events.js';
 import { Registry } from './core/registry.js';
 import { PluginManager } from './core/plugins.js';
 import { HotkeyManager, DEFAULT_HOTKEYS, registerDefaultVariables } from './core/hotkeys.js';
-import { h, debounce } from './core/utils.js';
+import { h, debounce, copyText } from './core/utils.js';
 import { registerBuiltinBlocks } from './blocks/index.js';
 import { editable, htmlToMarkdown } from './blocks/text.js';
 import { registerBuiltinThemes, shiftHue } from './themes.js';
@@ -640,7 +640,7 @@ class App {
       /** Plugin-eigene Einstellungen */
       getData: () => (app.settings.pluginData || {})[pluginId] || {},
       setData: (data) => app.saveSettings({ pluginData: { ...(app.settings.pluginData || {}), [pluginId]: data } }),
-      ui: { h, icon, editable, htmlToMarkdown }
+      ui: { h, icon, editable, htmlToMarkdown, copyText }
     };
   }
 }

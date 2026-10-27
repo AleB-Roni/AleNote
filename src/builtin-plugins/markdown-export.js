@@ -30,7 +30,7 @@ export default {
     app.registerCommand({
       id: 'md.copy', name: 'Als Markdown kopieren', icon: 'copy', group: 'Export', noteMenu: true,
       when: () => !!app.note,
-      run: async () => { await navigator.clipboard.writeText(noteToMarkdown(app)); app.toast('Markdown kopiert', { type: 'success' }); }
+      run: async () => { await app.ui.copyText(noteToMarkdown(app)); app.toast('Markdown kopiert', { type: 'success' }); }
     });
   }
 };

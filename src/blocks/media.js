@@ -1,5 +1,5 @@
 // Bild-, Code-, Trenner- und Inhaltsverzeichnis-Blöcke
-import { h, clamp, stripHtml } from '../core/utils.js';
+import { h, clamp, stripHtml, copyText } from '../core/utils.js';
 import { resolveSrc } from '../core/api.js';
 import { icon } from '../ui/icons.js';
 import { toast, prompt, contextMenu } from '../ui/overlays.js';
@@ -96,7 +96,7 @@ export default function registerMediaBlocks(registry) {
       const langBtn = h('button.code-lang', { text: b.data.lang || 'Text' });
       langBtn.addEventListener('click', () => contextMenu(LANGS.map((l) => ({ label: l, active: l === b.data.lang, run: () => { ctx.update({ lang: l }); langBtn.textContent = l; } })), langBtn));
       const copy = h('button.code-copy', {}, icon('copy', 13), 'Kopieren');
-      copy.addEventListener('click', async () => { await navigator.clipboard.writeText(b.data.code || ''); toast('Code kopiert', { type: 'success' }); });
+      copy.addEventListener('click', async () => { await copyText(b.data.code || ''); toast('Code kopiert', { type: 'success' }); });
       return h('div.code-block', {}, h('div.code-head', {}, langBtn, copy), pre);
     },
     onKeyDown(e, ctx, el) {

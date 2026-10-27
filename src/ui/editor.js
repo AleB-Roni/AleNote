@@ -3,7 +3,7 @@
 // und frei beweglichen Bildern (floats): { id, src, x, y, w, rot, z }
 
 import { h, uid, debounce, setPath, placeCaret, setCaretOffset, getCaretOffset, isCaretAtStart, isCaretAtEnd,
-  isCaretOnFirstLine, isCaretOnLastLine, splitAtCaret, isEmptyHtml, getCaretClientRect, sanitizeHtml, clamp, stripHtml } from '../core/utils.js';
+  isCaretOnFirstLine, isCaretOnLastLine, splitAtCaret, isEmptyHtml, getCaretClientRect, sanitizeHtml, clamp, stripHtml, copyText } from '../core/utils.js';
 import { History } from '../core/history.js';
 import { resolveSrc } from '../core/api.js';
 import { icon } from './icons.js';
@@ -416,7 +416,7 @@ export class Editor {
       const def = this.def(b.type);
       try { return def?.toMarkdown ? def.toMarkdown(b, this.app) : stripHtml(b.data.text || ''); } catch { return stripHtml(b.data.text || ''); }
     }).join('\n');
-    try { await navigator.clipboard.writeText(md); } catch {}
+    await copyText(md);
     this.app.toast?.(`${blocks.length} Blöcke ${cut ? 'ausgeschnitten' : 'kopiert'}`, { duration: 1400 });
     if (cut) { this.multiSelected = ids; this.deleteMulti(); }
   }

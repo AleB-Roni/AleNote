@@ -4,7 +4,7 @@
 //   scope:  'auto' (Markierung → Block → Seite) | 'selection' | 'block' | 'page'
 //   output: 'replace' (ersetzen) | 'below' (darunter einfügen) | 'chat' (im Chat anzeigen)
 
-import { h, uid, stripHtml, escapeHtml } from '../core/utils.js';
+import { h, uid, stripHtml, escapeHtml, copyText } from '../core/utils.js';
 import { icon } from '../ui/icons.js';
 import { toast, popover, closeMenu } from '../ui/overlays.js';
 import { PROVIDERS, streamChat } from './providers.js';
@@ -371,7 +371,7 @@ class ResultPanel {
       h('button.btn.btn-primary.small', { onclick: () => this.finish(this.action.output === 'below' && !isSel ? 'below' : 'replace') }, icon('check', 14), this.action.output === 'below' && !isSel ? 'Einfügen' : 'Ersetzen'),
       this.action.output !== 'below' || isSel ? h('button.btn.small', { onclick: () => this.finish('below') }, icon('plus', 14), 'Darunter einfügen') : null,
       h('button.btn.small', { title: 'Neu generieren', onclick: () => { this.messages = [...this.req.messages]; this.generate(); } }, icon('refresh', 14)),
-      h('button.btn.small', { title: 'Kopieren', onclick: async () => { await navigator.clipboard.writeText(cleanResult(this.text)); toast('Kopiert', { duration: 1000 }); } }, icon('copy', 14)),
+      h('button.btn.small', { title: 'Kopieren', onclick: async () => { await copyText(cleanResult(this.text)); toast('Kopiert', { duration: 1000 }); } }, icon('copy', 14)),
       h('div.flex'),
       h('button.btn.small', { onclick: () => this.close() }, 'Verwerfen'));
     const where = SCOPE_NAMES[this.target.kind];

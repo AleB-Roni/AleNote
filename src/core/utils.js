@@ -205,3 +205,19 @@ export function formatDate(date, format) {
   };
   return format.replace(/YYYY|YY|MMMM|MM|DD|dddd|HH|mm|ss/g, (t) => map[t]);
 }
+
+/** Text in die Zwischenablage – mit Ersatzweg, weil Browser die Zwischenablage nur über HTTPS freigeben */
+export async function copyText(text) {
+  try { if (navigator.clipboard?.writeText) { await navigator.clipboard.writeText(text); return true; } } catch {}
+  const ta = Object.assign(document.createElement('textarea'), { value: text });
+  ta.setAttribute('readonly', '');
+  ta.style.cssText = 'position:fixed;left:-9999px;top:0;opacity:0';
+  const active = document.activeElement;
+  document.body.append(ta);
+  ta.select();
+  let ok = false;
+  try { ok = document.execCommand('copy'); } catch {}
+  ta.remove();
+  active?.focus?.({ preventScroll: true });
+  return ok;
+}

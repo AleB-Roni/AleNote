@@ -1,5 +1,5 @@
 // KI-Chat in einer einklappbaren Seitenleiste rechts
-import { h, escapeHtml } from '../core/utils.js';
+import { h, escapeHtml, copyText } from '../core/utils.js';
 import { icon } from '../ui/icons.js';
 import { toast, contextMenu, confirmDialog } from '../ui/overlays.js';
 import { PROVIDERS, streamChat } from './providers.js';
@@ -182,7 +182,7 @@ export class ChatPanel {
     const body = h('div.ai-bubble.md', { html: m.error ? `<div class="ai-error">${escapeHtml(m.error)}</div>` : this.linkNotes(renderMarkdown(m.content)) });
     body.addEventListener('click', (e) => { const a = e.target.closest('[data-note]'); if (a) { e.preventDefault(); this.app.openNote(a.dataset.note); } });
     const actions = m.streaming || m.error ? null : h('div.ai-msg-actions', {},
-      h('button', { title: 'Kopieren', onclick: async () => { await navigator.clipboard.writeText(m.content); toast('Kopiert', { duration: 1000 }); } }, icon('copy', 13), 'Kopieren'),
+      h('button', { title: 'Kopieren', onclick: async () => { await copyText(m.content); toast('Kopiert', { duration: 1000 }); } }, icon('copy', 13), 'Kopieren'),
       h('button', { title: 'Als Blöcke in die Notiz einfügen', onclick: () => this.insertIntoNote(m.content) }, icon('plus', 13), 'Einfügen'),
       this.withContext ? h('button', { title: 'Die ganze Notiz durch diese Antwort ersetzen', onclick: () => this.replaceNote(m.content) }, icon('refresh', 13), 'Notiz ersetzen') : null);
     const sources = m.sources?.length && !m.streaming ? h('div.ai-sources', {}, h('span.muted', { text: 'Durchsucht:' }),
