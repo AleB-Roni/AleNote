@@ -93,6 +93,7 @@ export class AccountUI {
       { label: 'Jetzt synchronisieren', icon: 'refresh', run: () => this.api.syncNow() },
       { label: 'Konto & Sync…', icon: 'settings', run: () => this.app.openSettings('account') },
       '-',
+      { label: 'Server-Adresse ändern …', icon: 'cloud', run: () => this.changeServer() },
       { label: 'Konto wechseln', icon: 'user', run: () => this.switchAccount() },
       { label: 'Abmelden', icon: 'x', danger: true, run: () => this.logout() }
     ], anchor));
@@ -103,7 +104,7 @@ export class AccountUI {
   loginDialog({ server = this.app.settings.lastServer || this.api.defaultServer || '', username = '', relogin = false, web = false } = {}) {
     let registerMode = false;
     let serverInfo = null;
-    const serverIn = h('input.input', { value: server, placeholder: 'z.B. http://192.168.1.20:8787', spellcheck: 'false' });
+    const serverIn = h('input.input', { value: server, placeholder: 'z.B. notizen.meine-domain.de oder 192.168.1.20:8787', spellcheck: 'false', autocapitalize: 'off' });
     const info = h('div.login-server-info.muted.small');
     const userIn = h('input.input', { value: username, placeholder: 'Benutzername', autocomplete: 'username' });
     const nameIn = h('input.input', { placeholder: 'Anzeigename (optional)' });
@@ -119,8 +120,11 @@ export class AccountUI {
       if (!serverIn.value.trim()) return;
       try {
         serverInfo = await this.api.probeServer(serverIn.value);
+        // Erkannte Adresse übernehmen (z.B. https:// ergänzt oder Weiterleitung des Reverse-Proxys)
+        if (serverInfo.resolved && serverInfo.resolved !== serverIn.value.trim()) serverIn.value = serverInfo.resolved;
+        const secure = /^https:/i.test(serverInfo.resolved || serverIn.value);
         info.innerHTML = '';
-        info.append(icon('check', 13), ` ${serverInfo.name} · Version ${serverInfo.version}`);
+        info.append(icon('check', 13), ` ${serverInfo.name} · Version ${serverInfo.version}${secure ? ' · 🔒 HTTPS' : ''}`);
         info.className = 'login-server-info ok small';
         toggle.classList.toggle('hidden', !serverInfo.allowRegistration);
       } catch (e) {
@@ -182,6 +186,20 @@ export class AccountUI {
     await this.app.saveSettings({ lastOpen: null, recent: [], favorites: [], expanded: [] });
     location.reload();
     return true;
+  }
+
+  /** Gleicher Server unter neuer Adresse (z.B. Reverse-Proxy mit HTTPS) – ohne neu anzumelden */
+  async changeServer() {
+    if (!this.api.changeServer) return;
+    const { prompt } = await import('./overlays.js');
+    const input = await prompt('Neue Server-Adresse', { value: this.account.server, placeholder: 'z.B. notizen.meine-domain.de', okLabel: 'Umstellen' });
+    if (!input || input.trim() === this.account.server) return;
+    try {
+      this.account = await this.api.changeServer(input);
+      await this.app.saveSettings({ lastServer: this.account.server });
+      this.render();
+      toast(`Server-Adresse geändert: ${this.account.server}`, { type: 'success' });
+    } catch (e) { toast(e.message.replace(/^Error invoking remote method '[^']+': (Error: )?/, ''), { type: 'error', duration: 6000 }); }
   }
 
   async switchAccount() {
@@ -281,8 +299,10 @@ export class AccountUI {
     page.append(
       h('div.set-row', {}, h('div.set-label', {}, h('div', { text: 'Status' }), h('div.muted.small', { text: this.status.message || `Letzter Abgleich: ${ago(this.status.lastSync)}` })),
         h('div.set-control', {}, h('span.sync-chip.static.' + (st.cls || 'none'), {}, icon(st.icon, 14), h('span', { text: st.label })))),
-      h('div.set-row', {}, h('div.set-label', {}, h('div', { text: 'Server' }), h('div.muted.small', { text: a.server })),
-        h('div.set-control', {}, h('button.btn.small', { onclick: () => { this.api.syncNow(); setTimeout(rerender, 1200); } }, icon('refresh', 14), 'Jetzt synchronisieren'))),
+      h('div.set-row', {}, h('div.set-label', {}, h('div', { text: 'Server' }), h('div.muted.small', { text: (/^https:/i.test(a.server) ? '🔒 ' : '') + a.server })),
+        h('div.set-control', {}, h('div.row-inline', {},
+          this.api.changeServer ? h('button.btn.small', { title: 'Z.B. auf die neue HTTPS-Adresse umstellen – Anmeldung und Notizen bleiben', onclick: () => this.changeServer().then(rerender) }, icon('edit', 14), 'Adresse ändern') : null,
+          h('button.btn.small', { onclick: () => { this.api.syncNow(); setTimeout(rerender, 1200); } }, icon('refresh', 14), 'Jetzt synchronisieren')))),
       h('div.set-row', {}, h('div.set-label', {}, h('div', { text: 'Lokaler Ordner' }), h('div.muted.small', { text: 'Hier liegen die Notizen dieses Kontos auf deinem PC' })),
         h('div.set-control', {}, h('button.btn.small', { onclick: () => this.api.openFolder('') }, icon('folder', 14), 'Öffnen'))),
       a.role === 'admin' ? h('div.set-row', {}, h('div.set-label', {}, h('div', { text: 'Admin-Konsole' }), h('div.muted.small', { text: 'Benutzer anlegen, Einstellungen, Sitzungen' })),

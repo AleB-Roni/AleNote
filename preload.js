@@ -35,6 +35,7 @@ contextBridge.exposeInMainWorld('alenoteNative', {
   // Konto & Synchronisierung
   getAccount: call('account:get'),
   probeServer: call('account:probe'),
+  changeServer: call('account:changeServer'),
   login: call('account:login'),
   logout: call('account:logout'),
   accountInfo: call('account:me'),

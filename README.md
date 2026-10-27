@@ -37,6 +37,8 @@ Der AleNote-Server (Docker/Unraid oder `start-server.bat`) liefert AleNote auch 
 
 ## Server, Konten & Synchronisierung
 
+> **HTTPS:** Der Server lässt sich hinter einen Reverse-Proxy (z.B. Nginx Proxy Manager) stellen, auch unter einem Unterpfad. Bei der Anmeldung reicht die Domain – AleNote probiert HTTPS zuerst und folgt Weiterleitungen. Bestehende Geräte stellen über *Konto-Menü → Server-Adresse ändern* um, ohne neu anzumelden. Anleitung: [unraid/README.md](unraid/README.md#6-https-über-einen-reverse-proxy-empfohlen).
+
 AleNote kann sich mit einem **eigenen AleNote-Server** verbinden (Ordner [`server/`](server/README.md)):
 
 - **Mehrere Benutzer**, jeder mit eigenem, getrenntem Notiz-Speicher

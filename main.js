@@ -242,11 +242,30 @@ let sync;
 let updater;
 const notify = (channel, payload) => { if (win && !win.isDestroyed()) win.webContents.send(channel, payload); };
 
-function normalizeServer(url) {
-  let u = String(url || '').trim().replace(/\/+$/, '');
-  if (!u) throw new Error('Bitte eine Server-Adresse eingeben');
-  if (!/^https?:\/\//i.test(u)) u = 'http://' + u;
-  return u;
+/**
+ * Server-Adresse prüfen und vervollständigen:
+ * - ohne http(s):// wird zuerst https, dann http probiert
+ * - Weiterleitungen (z.B. Reverse-Proxy http → https) werden übernommen
+ * - auch Unterpfade wie https://domain.de/alenote funktionieren
+ */
+async function resolveServer(input) {
+  const raw = String(input || '').trim().replace(/\/+$/, '');
+  if (!raw) throw new Error('Bitte eine Server-Adresse eingeben');
+  const bare = raw.replace(/^https?:\/\//i, '');
+  const candidates = /^https:\/\//i.test(raw) ? [raw] : /^http:\/\//i.test(raw) ? [raw, 'https://' + bare] : ['https://' + bare, 'http://' + bare];
+  let lastErr = '';
+  for (const c of candidates) {
+    try {
+      const res = await fetch(c + '/api/health', { signal: AbortSignal.timeout(8e3) });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.ok) { lastErr = res.ok ? 'Unter dieser Adresse läuft kein AleNote-Server' : 'Fehler ' + res.status; continue; }
+      const final = new URL(res.url);
+      return { server: (final.origin + final.pathname.replace(/\/api\/health$/, '')).replace(/\/+$/, ''), health: data };
+    } catch (e) {
+      lastErr = /certificate|CERT|SSL/i.test(String(e.cause?.code || e.cause?.message || e.message)) ? 'HTTPS-Zertifikat ungültig' : '';
+    }
+  }
+  throw new Error('Server nicht erreichbar: ' + raw + (lastErr ? ' (' + lastErr + ')' : ''));
 }
 
 async function serverCall(server, method, url, body, token) {
@@ -275,10 +294,23 @@ function registerAccountIpc() {
   });
 
   ipcMain.handle('account:get', () => ({ account: publicAccount(), vault, status: sync.status }));
-  ipcMain.handle('account:probe', async (_e, server) => serverCall(normalizeServer(server), 'GET', '/api/health'));
+  ipcMain.handle('account:probe', async (_e, server) => { const r = await resolveServer(server); return { ...r.health, resolved: r.server }; });
+  // Neue Adresse für denselben Server (z.B. jetzt über HTTPS/Reverse-Proxy): Anmeldung und Notizen bleiben
+  ipcMain.handle('account:changeServer', async (_e, input) => {
+    const acc = settings.account;
+    if (!acc) throw new Error('Nicht angemeldet');
+    const { server } = await resolveServer(input);
+    const me = await serverCall(server, 'GET', '/api/me', null, acc.token).catch(() => { throw new Error('Unter dieser Adresse ist deine Anmeldung nicht gültig – ist es wirklich derselbe AleNote-Server?'); });
+    if (me.user?.id !== acc.userId) throw new Error('Das ist ein anderer AleNote-Server (anderes Konto)');
+    sync.stop();
+    acc.server = server;
+    await saveSettings();
+    sync.start();
+    return publicAccount();
+  });
 
   ipcMain.handle('account:login', async (_e, { server, username, password, register, displayName }) => {
-    server = normalizeServer(server);
+    server = (await resolveServer(server)).server;
     const device = `AleNote Desktop (${os.hostname()})`;
     const r = await serverCall(server, 'POST', register ? '/api/register' : '/api/login', { username, password, displayName, device });
     const host = new URL(server).host.replace(/[^\w.-]/g, '_');

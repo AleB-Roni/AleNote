@@ -41,6 +41,25 @@ Der Container enthält auch eine **Web-Version**: `http://<Unraid-IP>:8787/app/`
 Die Notizen werden im Browser gespeichert und automatisch mit dem Server abgeglichen, genau wie in der Windows- und Handy-App.
 Auf dem Mac lässt sie sich wie ein Programm ins Dock legen: Safari → **Ablage → Zum Dock hinzufügen** (Chrome: ⋮ → **Streamen, speichern und teilen → Seite als App installieren**).
 
+### 6. HTTPS über einen Reverse-Proxy (empfohlen)
+
+Mit HTTPS funktionieren in der Web-Version auch Mikrofon (Diktieren), System-Benachrichtigungen und die Zwischenablage.
+Beispiel **Nginx Proxy Manager** → *Proxy Hosts* → *Add Proxy Host*:
+
+| Feld | Wert |
+|---|---|
+| Domain Names | z.B. `notizen.meine-domain.de` |
+| Scheme / Forward Hostname / Port | `http` · Unraid-IP · `8787` |
+| Block Common Exploits | an |
+| SSL | Let's Encrypt-Zertifikat, **Force SSL** und **HTTP/2** an |
+
+Websockets braucht AleNote nicht. Falls beim Hochladen großer Bilder oder App-Updates „413“ kommt, unter *Advanced* `client_max_body_size 600m;` eintragen.
+
+Danach:
+- **Web-Version:** `https://notizen.meine-domain.de` öffnen und einmal anmelden (der Browser trennt Daten je Adresse).
+- **Windows- und Handy-App:** Konto-Menü unten links → **Server-Adresse ändern …** → neue Adresse eintragen. Anmeldung und Notizen bleiben, es wird nichts neu heruntergeladen.
+- Bei neuen Anmeldungen reicht die Domain ohne `https://` – AleNote probiert HTTPS automatisch zuerst.
+
 ## Update
 
 Docker-Tab → **Check for Updates** → **apply update**.
