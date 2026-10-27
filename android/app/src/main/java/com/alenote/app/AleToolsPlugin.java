@@ -30,9 +30,45 @@ import java.util.ArrayList;
  *  - print:     Android-Druckdialog für die aktuelle Seite (dort „Als PDF speichern“)
  *  - shareFile: Datei (Base64) über das Teilen-Menü weitergeben bzw. speichern
  *  - speechToText: Spracherkennung von Android (wie bei der Tastatur, ohne API-Schlüssel)
+ *  - getLaunchAction / Ereignis „launchAction“: Start über Kachel, Widget oder App-Verknüpfung
+ *  - updateWidget: Zahl der heute fälligen/überfälligen Aufgaben für das Widget
  */
 @CapacitorPlugin(name = "AleTools")
 public class AleToolsPlugin extends Plugin {
+    private static AleToolsPlugin instance;
+
+    @Override
+    public void load() {
+        instance = this;
+    }
+
+    /** Neue Startaktion, während die App schon läuft (MainActivity.onNewIntent) */
+    public static boolean emitLaunch(String action) {
+        AleToolsPlugin p = instance;
+        if (p == null || p.getBridge() == null || !p.hasListeners("launchAction")) return false;
+        JSObject ret = new JSObject();
+        ret.put("action", action);
+        p.notifyListeners("launchAction", ret, true);
+        return true;
+    }
+
+    @PluginMethod
+    public void getLaunchAction(PluginCall call) {
+        JSObject ret = new JSObject();
+        String a = LaunchActions.take();
+        ret.put("action", a == null ? "" : a);
+        call.resolve(ret);
+    }
+
+    @PluginMethod
+    public void updateWidget(PluginCall call) {
+        getContext().getSharedPreferences("alenote", Context.MODE_PRIVATE).edit()
+            .putInt("widget_today", call.getInt("today", 0))
+            .putInt("widget_overdue", call.getInt("overdue", 0))
+            .apply();
+        QuickNoteWidget.refresh(getContext());
+        call.resolve();
+    }
 
     @PluginMethod
     public void print(PluginCall call) {

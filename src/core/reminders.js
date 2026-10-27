@@ -57,6 +57,7 @@ export class ReminderService {
 
   async refresh() {
     try { this.todos = await collectTodos(this.app); } catch { return; }
+    this.updateWidget();
     if (this.native) await this.scheduleNative();
     else this.check();
   }
@@ -67,6 +68,14 @@ export class ReminderService {
       const key = `${t.path}#${t.id}@${t.due}${t.time || ''}`;
       return { ...t, key, at: this.snoozed[key] || reminderTime(t, rs) };
     }).filter((t) => t.at);
+  }
+
+  /** Android-Widget: Anzahl heute fälliger und überfälliger Aufgaben */
+  updateWidget() {
+    const tools = this.app.api.native ? this.app.api.plugins?.AleTools : null;
+    if (!tools?.updateWidget) return;
+    const open = this.todos.filter((t) => !t.checked && t.due), day = todayKey();
+    tools.updateWidget({ today: open.filter((t) => t.due === day).length, overdue: open.filter((t) => t.due < day).length }).catch(() => {});
   }
 
   /** Browser & Windows: fällige Erinnerungen anzeigen */

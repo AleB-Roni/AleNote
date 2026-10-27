@@ -1,5 +1,6 @@
 package com.alenote.app;
 
+import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Bundle;
 
@@ -13,7 +14,18 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(ApkInstallerPlugin.class);
         registerPlugin(AleToolsPlugin.class);
         clearCacheAfterUpdate();
+        if (savedInstanceState == null) LaunchActions.set(LaunchActions.read(getIntent()));
         super.onCreate(savedInstanceState);
+    }
+
+    /** App läuft schon: Aktion von Kachel/Widget/Verknüpfung direkt an die Oberfläche geben */
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        String action = LaunchActions.read(intent);
+        if (action == null) return;
+        if (!AleToolsPlugin.emitLaunch(action)) LaunchActions.set(action);
     }
 
     /**

@@ -4,4 +4,15 @@
     <string name="title_activity_main">AleNote</string>
     <string name="package_name">com.alenote.app</string>
     <string name="custom_url_scheme">com.alenote.app</string>
+    <string name="tile_label">Schnellnotiz</string>
+    <string name="widget_title">AleNote Schnellnotiz</string>
+    <string name="widget_description">Schnellnotiz, Diktieren und heute fällige Aufgaben</string>
+    <string name="widget_none">Tippen zum Notieren</string>
+    <string name="widget_overdue">%d überfällig</string>
+    <plurals name="widget_today">
+        <item quantity="one">%d Aufgabe heute</item>
+        <item quantity="other">%d Aufgaben heute</item>
+    </plurals>
+    <string name="shortcut_dictate">Diktieren</string>
+    <string name="shortcut_calendar">Kalender</string>
 </resources>

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Verknüpfungen beim langen Drücken auf das App-Symbol -->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut android:shortcutId="quicknote" android:enabled="true" android:icon="@drawable/ic_shortcut_note"
+        android:shortcutShortLabel="@string/tile_label" android:shortcutLongLabel="@string/tile_label">
+        <intent android:action="com.alenote.app.ACTION_QUICKNOTE" android:targetPackage="com.alenote.app" android:targetClass="com.alenote.app.MainActivity" />
+    </shortcut>
+    <shortcut android:shortcutId="dictate" android:enabled="true" android:icon="@drawable/ic_shortcut_mic"
+        android:shortcutShortLabel="@string/shortcut_dictate" android:shortcutLongLabel="@string/shortcut_dictate">
+        <intent android:action="com.alenote.app.ACTION_DICTATE" android:targetPackage="com.alenote.app" android:targetClass="com.alenote.app.MainActivity" />
+    </shortcut>
+    <shortcut android:shortcutId="calendar" android:enabled="true" android:icon="@drawable/ic_shortcut_calendar"
+        android:shortcutShortLabel="@string/shortcut_calendar" android:shortcutLongLabel="@string/shortcut_calendar">
+        <intent android:action="com.alenote.app.ACTION_CALENDAR" android:targetPackage="com.alenote.app" android:targetClass="com.alenote.app.MainActivity" />
+    </shortcut>
+</shortcuts>

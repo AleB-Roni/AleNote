@@ -66,6 +66,21 @@ export function initMobile(app) {
     api.plugins.App.minimizeApp();
   });
 
+  // Start über Schnelleinstellungs-Kachel, Widget oder App-Verknüpfung
+  const tools = api.plugins.AleTools;
+  const runAction = (action) => {
+    if (!action) return;
+    if (action === 'calendar') { setDrawer(false); app.openCalendar(); return; }
+    app.quickNote();
+    if (action === 'dictate') setTimeout(() => document.querySelector('.qn-modal .qn-mic')?.click(), 350);
+  };
+  const pollAction = () => tools.getLaunchAction().then((r) => runAction(r?.action)).catch(() => {});
+  app.events.on('app:ready', () => {
+    tools.addListener('launchAction', (e) => runAction(e?.action))?.catch?.(() => {});
+    pollAction();
+  });
+  api.plugins.App.addListener('resume', () => { if (document.body.classList.contains('ready')) setTimeout(pollAction, 150); });
+
   // Beim Wechsel in den Hintergrund sofort speichern
   api.plugins.App.addListener('pause', () => app.saveNow());
 
