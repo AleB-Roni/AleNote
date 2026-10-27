@@ -231,7 +231,7 @@ function hotkeys(app, page, rerender) {
     }
   }
   page.append(table);
-  page.append(h('p.muted.small', { html: 'Fest eingebaut: <kbd>Strg</kbd><kbd>B</kbd> Fett · <kbd>Strg</kbd><kbd>I</kbd> Kursiv · <kbd>Strg</kbd><kbd>U</kbd> Unterstrichen · <kbd>Strg</kbd><kbd>E</kbd> Code · <kbd>Strg</kbd><kbd>K</kbd> Link · <kbd>Tab</kbd> Einrücken · <kbd>/</kbd> Befehle' }));
+  page.append(h('p.muted.small', { html: 'Fest eingebaut: <kbd>Strg</kbd><kbd>B</kbd> Fett · <kbd>Strg</kbd><kbd>I</kbd> Kursiv · <kbd>Strg</kbd><kbd>U</kbd> Unterstrichen · <kbd>Strg</kbd><kbd>E</kbd> Code · <kbd>Strg</kbd><kbd>K</kbd> Link · <kbd>Strg</kbd><kbd>A</kbd> 1× Block, 2× alles · <kbd>Tab</kbd> Einrücken · <kbd>/</kbd> Befehle' }));
 }
 
 function account(app, page, rerender) {

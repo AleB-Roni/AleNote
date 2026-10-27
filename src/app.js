@@ -92,9 +92,15 @@ class App {
       h('div.flex.drag-region'),
       this.statusItems,
       this.statusEl,
+      h('button.icon-btn.undo-btn', { title: 'Rückgängig (Strg+Z)', disabled: true, onmousedown: (e) => e.preventDefault(), onclick: () => this.editor.undo() }, icon('undo', 17)),
+      h('button.icon-btn.redo-btn', { title: 'Wiederholen (Strg+Y)', disabled: true, onmousedown: (e) => e.preventDefault(), onclick: () => this.editor.redo() }, icon('redo', 17)),
       h('button.icon-btn.fav-btn', { title: 'Favorit', onclick: () => this.currentPath && this.toggleFavorite(this.currentPath) }, icon('star', 17)),
       h('button.icon-btn', { title: 'Mehr', onclick: (e) => this.noteMenu(e.currentTarget) }, icon('more', 17)),
       h('div.titlebar-spacer'));
+    this.events.on('history:change', ({ canUndo, canRedo }) => {
+      topbar.querySelector('.undo-btn').disabled = !canUndo;
+      topbar.querySelector('.redo-btn').disabled = !canRedo;
+    });
     this.editorScroll = h('div.editor-scroll');
     this.mainEl = h('main.main', {}, topbar, this.editorScroll);
     root.append(this.sidebarEl, this.mainEl);
@@ -255,6 +261,7 @@ class App {
     const recent = (this.settings.recent || []).map(map);
     const expanded = [...this.sidebar.expanded].map(map);
     this.sidebar.expanded = new Set(expanded);
+    this.editor.remapHistory?.(from, to);
     if (this.currentPath) this.currentPath = map(this.currentPath);
     if (this.editor.path) this.editor.path = this.currentPath;
     this.saveSettings({ favorites, recent, expanded, lastOpen: this.currentPath });
@@ -356,6 +363,8 @@ class App {
     document.body.append(bd);
   }
 
+  toast(msg, opts) { toast(msg, opts); }
+
   runCommand(id) {
     const cmd = this.registry.commands.get(id);
     if (!cmd) return;
@@ -382,7 +391,8 @@ class App {
     const r = this.registry;
     const hasNote = () => !!this.editor?.note;
     const inTable = () => !!document.activeElement?.closest?.('.table-block');
-    const notInField = () => !/INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName) || !!document.activeElement?.closest?.('.editor-scroll');
+    // Eingabefelder und der Titel behalten ihr eigenes Strg+Z
+    const notInField = () => { const el = document.activeElement; return !(el && (/INPUT|TEXTAREA|SELECT/.test(el.tagName) || el.classList?.contains('note-title'))); };
     r.registerCommand({ id: 'core.newNote', name: 'Neue Notiz', icon: 'filePlus', shortcut: 'Ctrl+N', group: 'Notizen', run: () => this.createNote(this.sidebar.contextFolder()) });
     r.registerCommand({ id: 'core.newFolder', name: 'Neuer Ordner', icon: 'folderPlus', shortcut: 'Ctrl+Shift+N', group: 'Notizen', run: () => this.createFolder(this.sidebar.contextFolder()) });
     r.registerCommand({ id: 'core.palette', name: 'Suchen & Befehle', icon: 'search', shortcut: 'Ctrl+P', group: 'Navigation', run: () => this.palette.open() });

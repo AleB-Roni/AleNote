@@ -822,3 +822,9 @@ body.touch .fill-handle { width: 16px; height: 16px; right: -9px; bottom: -9px; 
 
 body.is-mobile { overscroll-behavior: none; }
 body.is-mobile .editor-scroll { -webkit-overflow-scrolling: touch; }
+.icon-btn:disabled { opacity: .3; cursor: default; }
+.icon-btn:disabled:hover { background: none; color: var(--text-2); }
+.main:not(.has-note) .undo-btn, .main:not(.has-note) .redo-btn { visibility: hidden; }
+.block.multi { background: color-mix(in srgb, var(--accent) 14%, transparent); box-shadow: none; border-radius: 0; }
+.block.multi:first-child { border-radius: 6px 6px 0 0; }
+.block.multi:last-child { border-radius: 0 0 6px 6px; }

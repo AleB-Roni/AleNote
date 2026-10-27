@@ -1,24 +1,40 @@
-// Rückgängig / Wiederholen pro Notiz (Schnappschüsse des Notizinhalts)
+// Rückgängig / Wiederholen pro Notiz
+// Jeder Eintrag: { snap: Notizinhalt als JSON, sel: Cursorposition zum Zeitpunkt der Änderung }
 
 export class History {
-  constructor(limit = 200) {
+  constructor(limit = 300) {
     this.limit = limit;
     this.reset(null);
   }
 
-  reset(snapshot) {
-    this.stack = snapshot ? [snapshot] : [];
+  reset(snap, sel = null) {
+    this.stack = snap ? [{ snap, sel }] : [];
     this.index = this.stack.length - 1;
   }
 
-  push(snapshot) {
-    if (this.stack[this.index] === snapshot) return;
+  get current() { return this.stack[this.index] || null; }
+  get canUndo() { return this.index > 0; }
+  get canRedo() { return this.index < this.stack.length - 1; }
+
+  push(snap, sel = null) {
+    if (this.current?.snap === snap) { if (sel) this.current.sel = sel; return false; }
     this.stack = this.stack.slice(0, this.index + 1);
-    this.stack.push(snapshot);
+    this.stack.push({ snap, sel });
     if (this.stack.length > this.limit) this.stack.shift();
     this.index = this.stack.length - 1;
+    return true;
   }
 
-  undo() { return this.index > 0 ? this.stack[--this.index] : null; }
-  redo() { return this.index < this.stack.length - 1 ? this.stack[++this.index] : null; }
+  /** Liefert den vorherigen Stand + die Cursorposition der rückgängig gemachten Änderung */
+  undo() {
+    if (!this.canUndo) return null;
+    const undone = this.stack[this.index--];
+    return { snap: this.current.snap, sel: undone.sel, fallbackSel: this.current.sel };
+  }
+
+  redo() {
+    if (!this.canRedo) return null;
+    const entry = this.stack[++this.index];
+    return { snap: entry.snap, sel: entry.sel, fallbackSel: null };
+  }
 }

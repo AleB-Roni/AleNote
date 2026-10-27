@@ -126,6 +126,8 @@ Voreingestellt sind: `Strg+Shift+D` Datum · `Strg+Shift+U` Uhrzeit · `Strg+Alt
 | Strg+\ | Seitenleiste ein/aus |
 | Strg+Shift+L | Hell/Dunkel |
 | F11 | Fokus-Modus |
+| Strg+Z / Strg+Y | Rückgängig / Wiederholen (auch per ↶ ↷ oben) |
+| Strg+A | 1× Blockinhalt, 2× alle Blöcke markieren (dann Entf, Strg+C, Strg+X) |
 | Strg+D | Block duplizieren |
 | Strg+Shift+↑/↓ | Block verschieben |
 | Strg+Alt+1/2/3/0 | In Überschrift 1/2/3 oder Text umwandeln |

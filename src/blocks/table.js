@@ -465,7 +465,17 @@ function renderTable(b, ctx) {
     if (mod && k === 'x' && (multi || !inCell)) { e.preventDefault(); e.stopPropagation(); copyRange(true); return; }
     if (mod && k === 'd') { e.preventDefault(); e.stopPropagation(); fillInto('down'); return; }
     if (mod && k === 'r') { e.preventDefault(); e.stopPropagation(); fillInto('right'); return; }
-    if (mod && k === 'a' && (!inCell || !cell.textContent)) { e.preventDefault(); setSel({ r: 0, c: 0 }, { r: d.rows.length - 1, c: cols - 1 }); wrap.focus(); return; }
+    if (mod && k === 'a' && !e.shiftKey) {
+      // 1× Zellinhalt · 2× ganze Tabelle · 3× alle Blöcke der Notiz (übernimmt der Editor)
+      const g = range();
+      const whole = g && g.r1 === 0 && g.c1 === 0 && g.r2 === d.rows.length - 1 && g.c2 === cols - 1;
+      if (inCell && cell.textContent && window.getSelection().toString().length < cell.textContent.length) return;
+      if (whole && !inCell) return;
+      e.preventDefault();
+      setSel({ r: 0, c: 0 }, { r: d.rows.length - 1, c: cols - 1 });
+      wrap.focus();
+      return;
+    }
     if ((e.key === 'Delete' || e.key === 'Backspace') && (multi || !inCell)) { e.preventDefault(); e.stopPropagation(); clearRange(); return; }
 
     const delta = { ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1] }[e.key];

@@ -27,6 +27,7 @@ export class Editor {
     this.note = null;
     this.path = null;
     this.history = new History();
+    this.histories = new Map(); // Verlauf je Notiz (bleibt beim Wechseln erhalten)
     this.selectedBlockId = null;
     this.slash = new SlashMenu(this);
     this.toolbar = new InlineToolbar(this);
@@ -42,7 +43,15 @@ export class Editor {
     this.note.blocks ||= [];
     this.note.floats ||= [];
     if (!this.note.blocks.length) this.note.blocks.push(this.newBlock('paragraph'));
-    this.history.reset(this.snapshot());
+    // Vorhandenen Verlauf dieser Notiz weiterverwenden; geänderter Inhalt (z.B. vom Server) wird ein neuer Schritt
+    const snap = this.snapshot();
+    let hist = this.histories.get(path);
+    if (hist) { this.histories.delete(path); hist.push(snap, null); }
+    else { hist = new History(); hist.reset(snap); }
+    this.histories.set(path, hist);
+    if (this.histories.size > 30) this.histories.delete(this.histories.keys().next().value);
+    this.history = hist;
+    this.emitHistory();
     this.renderAll();
     this.root.scrollTop = 0;
   }
@@ -51,6 +60,7 @@ export class Editor {
 
   renderAll() {
     const { note } = this;
+    this.multiSelected = null;
     this.slash.close();
     this.root.innerHTML = '';
     this.root.classList.toggle('full-width', !!note.fullWidth);
@@ -206,7 +216,32 @@ export class Editor {
 
   commit() {
     this.pushHistory.cancel();
-    this.history.push(this.snapshot());
+    if (this.history.push(this.snapshot(), this.captureSel())) this.emitHistory();
+  }
+
+  emitHistory() {
+    this.app.events.emit('history:change', { canUndo: this.history.canUndo, canRedo: this.history.canRedo });
+  }
+
+  /** Aktuelle Cursorposition merken (Block, Feld, Zeichenposition) */
+  captureSel() {
+    const el = document.activeElement;
+    const field = el?.closest?.('[data-field]');
+    const row = field?.closest('.block');
+    if (!row || !this.page?.contains(row)) return null;
+    return { id: row.dataset.id, field: field.dataset.field, offset: getCaretOffset(field) };
+  }
+
+  applySel(sel) {
+    if (!sel) return false;
+    const row = this.rowEl(sel.id);
+    if (!row) return false;
+    const el = row.querySelector(`[data-field="${CSS.escape(sel.field)}"]`) || row.querySelector('[data-editable="main"]');
+    if (!el) { this.selectBlock(sel.id); return true; }
+    this.selectBlock(null);
+    setCaretOffset(el, Math.min(sel.offset || 0, (el.textContent || '').length));
+    row.scrollIntoView({ block: 'nearest' });
+    return true;
   }
 
   /** Muss nach jeder Änderung aufgerufen werden: speichert & aktualisiert den Verlauf */
@@ -219,18 +254,107 @@ export class Editor {
     this.app.events.emit('note:change', this.note, this);
   }
 
-  restore(snap) {
-    if (!snap) return;
-    const focusedId = document.activeElement?.closest?.('.block')?.dataset.id;
-    Object.assign(this.note, JSON.parse(snap));
+  restore(step) {
+    if (!step) return false;
+    const scroll = this.root.scrollTop;
+    this.slash.close();
+    const before = this.note.blocks;
+    Object.assign(this.note, JSON.parse(step.snap));
+    const caret = this.diffCaret(before, this.note.blocks);
     this.renderAll();
+    this.root.scrollTop = scroll;
+    this.app.dirty = true;
     this.app.scheduleSave();
     this.app.events.emit('note:change', this.note, this);
-    if (focusedId && this.block(focusedId)) this.focusBlock(focusedId, 'end');
+    // Cursor dorthin setzen, wo die Änderung passiert ist
+    if (!this.applySel(caret) && !this.applySel(step.sel) && !this.applySel(step.fallbackSel)) {
+      const last = this.note.blocks.at(-1);
+      if (last) this.focusBlock(last.id, 'end');
+    }
+    this.emitHistory();
+    return true;
   }
 
-  undo() { this.pushHistory.flush(); this.restore(this.history.undo()); }
-  redo() { this.restore(this.history.redo()); }
+  /** Findet die geänderte Stelle zwischen zwei Ständen (für die Cursorposition nach Undo/Redo) */
+  diffCaret(oldBlocks, newBlocks) {
+    const oldById = new Map(oldBlocks.map((b) => [b.id, b]));
+    for (const b of newBlocks) {
+      const o = oldById.get(b.id);
+      if (!o) return this.def(b.type)?.text ? { id: b.id, field: 'text', offset: stripHtml(b.data.text || '').length } : null;
+      if (JSON.stringify(o.data) === JSON.stringify(b.data)) continue;
+      if (typeof b.data.text !== 'string' || o.data.text === b.data.text) return null;
+      const a = stripHtml(o.data.text || ''), n = stripHtml(b.data.text || '');
+      let pre = 0;
+      while (pre < a.length && pre < n.length && a[pre] === n[pre]) pre++;
+      let suf = 0;
+      while (suf < a.length - pre && suf < n.length - pre && a[a.length - 1 - suf] === n[n.length - 1 - suf]) suf++;
+      return { id: b.id, field: 'text', offset: n.length - suf };
+    }
+    // Block entfernt → Cursor ans Ende des vorherigen Blocks
+    const newIds = new Set(newBlocks.map((b) => b.id));
+    const idx = oldBlocks.findIndex((b) => !newIds.has(b.id));
+    for (let i = idx - 1; i >= 0; i--) {
+      const b = newBlocks.find((x) => x.id === oldBlocks[i].id);
+      if (b && this.def(b.type)?.text) return { id: b.id, field: 'text', offset: stripHtml(b.data.text || '').length };
+    }
+    return null;
+  }
+
+  undo() {
+    if (this.pushHistory) this.pushHistory.flush();
+    if (!this.restore(this.history.undo())) this.app.toast?.('Nichts mehr rückgängig zu machen', { duration: 1200 });
+  }
+
+  redo() {
+    if (!this.restore(this.history.redo())) this.app.toast?.('Nichts zum Wiederholen', { duration: 1200 });
+  }
+
+  // ---------- Alle Blöcke markieren ----------
+  selectAllBlocks() {
+    if (!this.note?.blocks.length) return;
+    this.pushHistory.flush();
+    this.selectBlock(null);
+    document.activeElement?.blur?.();
+    window.getSelection().removeAllRanges();
+    this.multiSelected = new Set(this.note.blocks.map((b) => b.id));
+    this.blocksEl.querySelectorAll(':scope > .block').forEach((r) => r.classList.add('selected', 'multi'));
+    this.app.toast?.(`${this.multiSelected.size} Blöcke markiert · Entf löscht · Strg+C kopiert`, { duration: 1800 });
+  }
+
+  clearMulti() {
+    if (!this.multiSelected) return;
+    this.multiSelected = null;
+    this.blocksEl?.querySelectorAll('.block.multi').forEach((r) => r.classList.remove('selected', 'multi'));
+  }
+
+  deleteMulti() {
+    const ids = this.multiSelected;
+    this.clearMulti();
+    this.note.blocks = this.note.blocks.filter((b) => !ids.has(b.id));
+    if (!this.note.blocks.length) this.note.blocks.push(this.newBlock('paragraph'));
+    this.renderAll();
+    this.changed(true);
+    this.focusBlock(this.note.blocks[0].id, 'start');
+  }
+
+  async copyMulti(cut = false) {
+    const ids = this.multiSelected;
+    const blocks = this.note.blocks.filter((b) => ids.has(b.id));
+    const md = blocks.map((b) => {
+      const def = this.def(b.type);
+      try { return def?.toMarkdown ? def.toMarkdown(b, this.app) : stripHtml(b.data.text || ''); } catch { return stripHtml(b.data.text || ''); }
+    }).join('\n');
+    try { await navigator.clipboard.writeText(md); } catch {}
+    this.app.toast?.(`${blocks.length} Blöcke ${cut ? 'ausgeschnitten' : 'kopiert'}`, { duration: 1400 });
+    if (cut) { this.multiSelected = ids; this.deleteMulti(); }
+  }
+
+  /** Verlauf mitnehmen, wenn eine Notiz umbenannt/verschoben wird */
+  remapHistory(from, to) {
+    for (const [k, v] of [...this.histories]) {
+      if (k === from || k.startsWith(from + '/')) { this.histories.delete(k); this.histories.set(to + k.slice(from.length), v); }
+    }
+  }
 
   // ================= Block-Operationen =================
 
@@ -534,8 +658,47 @@ export class Editor {
     });
 
     root.addEventListener('keydown', (e) => this.onKeyDown(e));
+    // Strg+A: 1× Inhalt des Blocks (Browser), 2× alle Blöcke der Notiz
+    root.addEventListener('keydown', (e) => {
+      if (!(e.ctrlKey || e.metaKey) || e.shiftKey || e.altKey || e.key.toLowerCase() !== 'a' || e.defaultPrevented) return;
+      if (!this.note || e.target.closest?.('.note-title')) return;
+      const ed = e.target.closest?.('[contenteditable]');
+      if (ed && e.target.closest('.block')) {
+        const sel = window.getSelection();
+        const text = (ed.textContent || '').replace(/\u200b/g, '');
+        const everything = !text.trim() || sel.toString().replace(/\s/g, '').length >= text.replace(/\s/g, '').length;
+        if (!everything) return; // erster Druck: Browser markiert den Blockinhalt
+      } else if (!e.target.closest?.('.table-block')) return;
+      e.preventDefault();
+      this.selectAllBlocks();
+    });
+
     document.addEventListener('keydown', (e) => {
-      if (!this.selectedBlockId || !this.root.isConnected) return;
+      if (!this.multiSelected || !this.root.isConnected) return;
+      const active = document.activeElement;
+      if (active && active !== document.body && active !== this.root) { this.clearMulti(); return; }
+      const mod = e.ctrlKey || e.metaKey, k = e.key.toLowerCase();
+      if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); this.deleteMulti(); }
+      else if (mod && (k === 'c' || k === 'x')) { e.preventDefault(); this.copyMulti(k === 'x'); }
+      else if (mod && k === 'a') e.preventDefault();
+      else if (e.key === 'Escape' || (!mod && !['Shift', 'Control', 'Alt', 'Meta'].includes(e.key))) {
+        if (e.key === 'Escape') e.preventDefault();
+        const first = [...this.multiSelected][0];
+        this.clearMulti();
+        if (e.key === 'Escape' && first) this.focusBlock(first, 'start');
+      }
+    }, true);
+    document.addEventListener('mousedown', (e) => { if (this.multiSelected && !e.target.closest('.menu')) this.clearMulti(); }, true);
+
+    document.addEventListener('keydown', (e) => {
+      if (!this.root.isConnected) return;
+      // Strg+A ohne Fokus (z.B. nach Klick neben den Text) → alle Blöcke
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a' && this.note && (document.activeElement === document.body || !document.activeElement) && !document.querySelector('.modal-backdrop, .palette-backdrop')) {
+        e.preventDefault();
+        this.selectAllBlocks();
+        return;
+      }
+      if (!this.selectedBlockId) return;
       const active = document.activeElement;
       if (active && active !== document.body && active !== this.root) return;
       if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); this.removeBlock(this.selectedBlockId, { animate: true, focusPrev: true }); }
