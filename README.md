@@ -74,6 +74,7 @@ Die portable EXE kann sich nicht selbst aktualisieren.
   - **Formeln** (`=A1*B1`, `=SUMME(B2:B9)`, MITTELWERT, MIN, MAX, ANZAHL, RUNDEN, WENN …) mit Formelleiste.
   - Sortieren, Summenzeile, Beschriftung A/B/1/2 einblendbar.
 - **Freie Tabellen**: per „Frei bewegen“ oder `/Freie Tabelle` überall auf der Seite platzieren (am Griff ziehen, Breite ändern).
+- **Zeichnen & Markieren**: Stift-Knopf oben, `/zeichnen` oder Strg+Alt+P (Textmarker: Strg+Alt+M). Stift, Textmarker und Radierer, mit Farben, Stärke und Transparenz (Regler und 25/50/75/100 %). Shift zeichnet gerade Linien, Strg+Z macht Striche rückgängig, Esc beendet den Modus. Die Zeichnungen werden mit der Notiz gespeichert und synchronisiert.
 - **Bilder**: Drag & Drop, Strg+V, Größe per Griff ändern, ausrichten, Lightbox (Doppelklick)
 - **Frei bewegliche Bilder**: Mit **Shift** ablegen oder „Frei bewegen“ wählen. Dann lassen sie sich verschieben, skalieren (4 Ecken), drehen (Shift = 15°-Schritte) und in Ebenen anordnen. Sie rasten an Mitte und Rändern ein (Alt schaltet das aus).
 - **Blöcke**: Am ⋮⋮-Griff ziehen zum Verschieben, Klick öffnet das Menü (Umwandeln, Farbe, Duplizieren, Löschen). Tab/Shift+Tab rückt ein bzw. aus.

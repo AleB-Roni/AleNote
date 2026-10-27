@@ -11,6 +11,7 @@ import { contextMenu, toast, popover } from './overlays.js';
 import { SlashMenu } from './slashmenu.js';
 import { InlineToolbar } from './toolbar.js';
 import { FloatLayer } from './floats.js';
+import { DrawLayer } from './drawing.js';
 import { emojiPicker, coverPicker, GRADIENTS } from './pickers.js';
 
 export const BLOCK_COLORS = [
@@ -109,6 +110,11 @@ export class Editor {
     this.floats?.destroy();
     this.floats = new FloatLayer(this, this.page);
     this.floats.render();
+
+    this.drawing?.destroy();
+    this.drawing = new DrawLayer(this, this.page);
+    this.drawing.render();
+    this.floats.updateHeight();
 
     this.root.append(this.page);
     this.app.events.emit('editor:render', this);
@@ -210,8 +216,8 @@ export class Editor {
   // ================= Änderungen =================
 
   snapshot() {
-    const { blocks, floats, icon: ic, cover, fullWidth } = this.note;
-    return JSON.stringify({ blocks, floats, icon: ic, cover, fullWidth });
+    const { blocks, floats, icon: ic, cover, fullWidth, drawing } = this.note;
+    return JSON.stringify({ blocks, floats, icon: ic, cover, fullWidth, drawing: drawing || { strokes: [] } });
   }
 
   commit() {

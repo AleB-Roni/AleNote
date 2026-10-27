@@ -268,6 +268,7 @@ export class FloatLayer {
   updateHeight() {
     let max = 0;
     this.layer.querySelectorAll('.float-item').forEach((el) => { max = Math.max(max, el.offsetTop + el.offsetHeight); });
+    max = Math.max(max, this.editor.drawing?.extent() || 0);
     this.page.style.minHeight = max ? max + 120 + 'px' : '';
   }
 }

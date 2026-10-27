@@ -55,6 +55,7 @@ export function initMobile(app) {
       return;
     }
     if (document.body.classList.contains('sidebar-open')) { setDrawer(false); return; }
+    if (app.drawMode) { app.toggleDrawMode(false); return; }
     if (document.activeElement && document.activeElement !== document.body) { document.activeElement.blur(); return; }
     if (isNarrow()) { setDrawer(true); return; }
     api.plugins.App.minimizeApp();

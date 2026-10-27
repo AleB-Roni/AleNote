@@ -17,6 +17,7 @@ import { toast, modal, prompt, confirmDialog, contextMenu } from './ui/overlays.
 import { welcomeNote } from './welcome.js';
 import { AccountUI } from './ui/account.js';
 import { UpdateUI } from './ui/updates.js';
+import { DrawToolbar } from './ui/drawing.js';
 import { initMobile, isNarrow } from './core/mobile.js';
 
 class App {
@@ -71,6 +72,10 @@ class App {
       else this.showEmpty();
     }
 
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && this.drawMode && !document.querySelector('.modal-backdrop, .palette-backdrop, .menu')) this.toggleDrawMode(false);
+    });
+    this.events.on('note:open', () => { if (this.drawMode) this.editor.drawing?.setActive(true); });
     window.addEventListener('beforeunload', () => { if (this.dirty) this.saveNow(); });
     window.addEventListener('focus', () => this.sidebar.refresh());
     document.body.classList.add('ready');
@@ -92,6 +97,7 @@ class App {
       h('div.flex.drag-region'),
       this.statusItems,
       this.statusEl,
+      h('button.icon-btn.draw-btn', { title: 'Zeichnen (Strg+Alt+P)', onclick: () => this.toggleDrawMode() }, icon('pen', 17)),
       h('button.icon-btn.undo-btn', { title: 'Rückgängig (Strg+Z)', disabled: true, onmousedown: (e) => e.preventDefault(), onclick: () => this.editor.undo() }, icon('undo', 17)),
       h('button.icon-btn.redo-btn', { title: 'Wiederholen (Strg+Y)', disabled: true, onmousedown: (e) => e.preventDefault(), onclick: () => this.editor.redo() }, icon('redo', 17)),
       h('button.icon-btn.fav-btn', { title: 'Favorit', onclick: () => this.currentPath && this.toggleFavorite(this.currentPath) }, icon('star', 17)),
@@ -365,6 +371,23 @@ class App {
 
   toast(msg, opts) { toast(msg, opts); }
 
+  // ---------- Zeichen-Modus ----------
+  toggleDrawMode(on = !this.drawMode) {
+    if (on && !this.editor.note) { toast('Öffne zuerst eine Notiz'); return; }
+    this.drawMode = on;
+    document.activeElement?.blur?.();
+    this.editor.drawing?.setActive(on);
+    this.drawToolbar ||= new DrawToolbar(this);
+    this.drawToolbar.show(on);
+    this.mainEl.querySelector('.draw-btn')?.classList.toggle('active-tool', on);
+    document.body.classList.toggle('draw-mode', on);
+  }
+
+  async confirmClearDrawing() {
+    if (!this.editor.note?.drawing?.strokes?.length) return;
+    if (await confirmDialog('Zeichnungen löschen?', 'Alle Striche dieser Notiz werden entfernt. Mit Strg+Z lässt sich das rückgängig machen.')) this.editor.drawing.clear();
+  }
+
   runCommand(id) {
     const cmd = this.registry.commands.get(id);
     if (!cmd) return;
@@ -423,6 +446,8 @@ class App {
       const urls = await api.pickImages();
       urls.forEach((src, i) => this.editor.floats.add(src, undefined, this.editorScroll.scrollTop + 80 + i * 40));
     } });
+    r.registerCommand({ id: 'core.draw', name: 'Zeichnen ein/aus', icon: 'pen', shortcut: 'Ctrl+Alt+P', group: 'Einfügen', when: hasNote, run: () => this.toggleDrawMode() });
+    r.registerCommand({ id: 'core.drawMarker', name: 'Textmarker', icon: 'highlighter', shortcut: 'Ctrl+Alt+M', group: 'Einfügen', when: hasNote, run: () => { this.saveSettings({ drawTool: 'marker' }); this.toggleDrawMode(true); this.drawToolbar.render(); } });
     r.registerCommand({ id: 'core.deleteNote', name: 'Aktuelle Notiz löschen', icon: 'trash', group: 'Notizen', when: hasNote, run: () => this.deleteItem(this.currentPath, this.editor.title) });
     r.registerCommand({ id: 'core.favorite', name: 'Favorit umschalten', icon: 'star', shortcut: 'Ctrl+Alt+F', group: 'Notizen', when: hasNote, run: () => this.toggleFavorite(this.currentPath) });
     r.registerCommand({ id: 'core.reload', name: 'AleNote neu laden', icon: 'refresh', shortcut: 'Ctrl+R', group: 'Allgemein', when: () => !inTable(), run: async () => { await this.saveNow(); location.reload(); } });
@@ -452,6 +477,10 @@ class App {
   }
 
   registerCoreSlashCommands() {
+    this.registry.registerSlashCommand({
+      id: 'core.draw', name: 'Zeichnen', icon: 'pen', group: 'Medien', description: 'Frei auf der Notiz zeichnen & markieren', keywords: ['zeichnen', 'malen', 'stift', 'marker', 'draw', 'markieren'],
+      run: () => this.toggleDrawMode(true)
+    });
     this.registry.registerSlashCommand({
       id: 'core.floatImage', name: 'Freies Bild', icon: 'move', group: 'Medien', description: 'Bild frei auf der Seite platzieren', keywords: ['bild', 'frei', 'float', 'sticker', 'image'],
       run: async (editor) => {
