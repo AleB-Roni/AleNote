@@ -62,6 +62,12 @@ export const PROVIDERS = {
   }
 };
 
+export function ollamaName(m) {
+  const parts = m.trim().toLowerCase().split(/\s+/);
+  const tag = /^(\d+(\.\d+)?[bm]|latest|e\d+b)$/.test(parts.at(-1)) && parts.length > 1 ? parts.pop() : '';
+  return parts.join('') + (tag ? ':' + tag : '');
+}
+
 /** Basis-Adresse eines Anbieters (bei Ollama/Open WebUI wird /v1 bzw. /api ergänzt, falls es fehlt) */
 export function baseUrlOf(cfg) {
   const p = PROVIDERS[cfg.provider] || {};
@@ -142,8 +148,10 @@ export async function streamChat(cfg, { system, messages, onText, signal }) {
   const p = PROVIDERS[cfg.provider];
   if (!p) throw new Error('Unbekannter KI-Anbieter');
   if (!cfg.apiKey && !p.noKey && !p.optionalKey) throw new Error(`Kein API-Schlüssel für ${p.name} hinterlegt (Einstellungen → KI)`);
-  const model = cfg.model || p.defaultModel;
+  let model = (cfg.model || p.defaultModel || '').trim();
   if (!model) throw new Error('Kein Modell angegeben (Einstellungen → KI)');
+  // Ollama: Anzeigenamen wie „Qwen3 8B“ in den technischen Namen „qwen3:8b“ umwandeln
+  if (cfg.provider === 'ollama' && /\s/.test(model)) model = ollamaName(model);
   const base = baseUrlOf(cfg);
   let text = '';
   let note = '';
