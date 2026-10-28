@@ -2,7 +2,7 @@
 import { h, uid } from '../core/utils.js';
 import { icon } from '../ui/icons.js';
 import { toast, confirmDialog } from '../ui/overlays.js';
-import { PROVIDERS, streamChat } from './providers.js';
+import { PROVIDERS, streamChat, listModels } from './providers.js';
 import { DEFAULT_ACTIONS, SCOPE_LABELS, OUTPUT_LABELS } from './ai.js';
 import { dictateSettings, dictationMethod, deviceSRAvailable } from './dictate.js';
 
@@ -30,6 +30,24 @@ export function renderAISettings(app, page, rerender, { shortcutRecorder, toggle
     const urlIn = p.editableUrl ? h('input.input', { value: pc.baseUrl || p.baseUrl, placeholder: 'Server-Adresse', spellcheck: 'false' }) : null;
     urlIn?.addEventListener('change', () => { pc.baseUrl = urlIn.value.trim(); ai.save(); });
     const testOut = h('span.small.muted');
+    // Installierte Modelle vom eigenen Server holen (Ollama, Open WebUI, OpenAI-kompatibel)
+    const datalist = h('datalist', { id: listId }, ...p.models.map((m) => h('option', { value: m })));
+    const loadModels = p.listModels ? h('button.btn.small', {
+      title: 'Installierte Modelle vom Server abrufen',
+      onclick: async () => {
+        testOut.textContent = 'Lade Modelle …';
+        testOut.className = 'small muted';
+        try {
+          const models = await listModels(ai.providerConfig(id));
+          datalist.replaceChildren(...models.map((m) => h('option', { value: m })));
+          if (!models.length) throw new Error('Der Server meldet keine Modelle');
+          if (!modelIn.value.trim() || !models.includes(modelIn.value.trim())) { modelIn.value = models[0]; pc.model = models[0]; ai.save(); }
+          testOut.textContent = `✓ ${models.length} ${models.length === 1 ? 'Modell' : 'Modelle'} gefunden – im Feld „Modell“ auswählen`;
+          testOut.className = 'small ai-ok';
+          modelIn.focus();
+        } catch (e) { testOut.textContent = '✗ ' + e.message; testOut.className = 'small ai-err'; }
+      }
+    }, icon('download', 13), 'Modelle laden') : null;
     const test = h('button.btn.small', {
       onclick: async () => {
         testOut.textContent = 'Teste …';
@@ -44,10 +62,10 @@ export function renderAISettings(app, page, rerender, { shortcutRecorder, toggle
     card.append(
       h('summary', {}, h('span.ai-dot'), h('b', { text: p.name }), h('div.flex'), h('span.muted.small', { text: ai.isConfigured(id) ? (pc.model || p.defaultModel) : 'nicht eingerichtet' })),
       h('div.ai-provider-body', {},
-        p.noKey ? null : h('label.ai-field', {}, h('span', { text: 'API-Schlüssel' }), h('div.row-inline', {}, keyIn, eye)),
-        h('label.ai-field', {}, h('span', { text: 'Modell' }), modelIn, h('datalist', { id: listId }, ...p.models.map((m) => h('option', { value: m })))),
-        urlIn ? h('label.ai-field', {}, h('span', { text: 'Server-Adresse' }), urlIn) : null,
-        h('div.row-inline', {}, test, p.keyUrl ? h('button.link-btn', { text: 'Schlüssel erstellen ↗', onclick: () => app.api.openExternal(p.keyUrl) }) : null, testOut)));
+        urlIn ? h('label.ai-field', {}, h('span', { text: 'Server-Adresse' }), urlIn, p.urlHelp ? h('span.muted.small.ai-help', { text: p.urlHelp }) : null) : null,
+        p.noKey ? null : h('label.ai-field', {}, h('span', { text: p.optionalKey ? 'API-Schlüssel (falls nötig)' : 'API-Schlüssel' }), h('div.row-inline', {}, keyIn, eye), p.keyHelp ? h('span.muted.small.ai-help', { text: p.keyHelp }) : null),
+        h('label.ai-field', {}, h('span', { text: 'Modell' }), modelIn, datalist),
+        h('div.row-inline', {}, test, loadModels, p.keyUrl ? h('button.link-btn', { text: 'Schlüssel erstellen ↗', onclick: () => app.api.openExternal(p.keyUrl) }) : null, testOut)));
     grid.append(card);
   }
   page.append(grid);

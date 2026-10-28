@@ -1,4 +1,4 @@
-// KI-Anbieter: Claude, ChatGPT, Gemini, Mistral, Groq, DeepSeek, xAI, OpenRouter, Ollama, eigene
+// KI-Anbieter: Claude, ChatGPT, Gemini, Mistral, Groq, DeepSeek, xAI, OpenRouter, Ollama, Open WebUI, eigene
 // Alle Anfragen laufen direkt aus der App zum Anbieter (mit Streaming).
 // API-Schlüssel werden nur lokal auf dem Gerät gespeichert.
 
@@ -47,13 +47,55 @@ export const PROVIDERS = {
   ollama: {
     name: 'Ollama (lokal, ohne Schlüssel)', protocol: 'openai', noKey: true, keyUrl: 'https://ollama.com',
     defaultModel: 'llama3.2', models: ['llama3.2', 'qwen2.5', 'mistral', 'gemma3'],
-    baseUrl: 'http://localhost:11434/v1', editableUrl: true
+    baseUrl: 'http://localhost:11434/v1', editableUrl: true, apiSuffix: '/v1', listModels: true,
+    urlHelp: 'z.B. http://192.168.1.20:11434 – „/v1“ wird automatisch ergänzt. Ollama muss mit OLLAMA_ORIGINS="*" laufen, sonst blockt es die App'
+  },
+  openwebui: {
+    name: 'Open WebUI (selbst gehostet)', protocol: 'openai', keyUrl: '',
+    keyHelp: 'In Open WebUI: Profilbild → Einstellungen → Konto → API-Schlüssel → „Neuen Schlüssel erstellen“',
+    urlHelp: 'Adresse von Open WebUI, z.B. https://ki.meine-domain.de oder http://192.168.1.20:3000 – „/api“ wird automatisch ergänzt',
+    defaultModel: '', models: [], baseUrl: 'http://localhost:3000/api', editableUrl: true, optionalKey: true, apiSuffix: '/api', listModels: true
   },
   custom: {
     name: 'Eigener (OpenAI-kompatibel)', protocol: 'openai', keyUrl: '',
-    defaultModel: '', models: [], baseUrl: 'http://localhost:1234/v1', editableUrl: true, optionalKey: true
+    defaultModel: '', models: [], baseUrl: 'http://localhost:1234/v1', editableUrl: true, optionalKey: true, listModels: true
   }
 };
+
+/** Basis-Adresse eines Anbieters (bei Ollama/Open WebUI wird /v1 bzw. /api ergänzt, falls es fehlt) */
+export function baseUrlOf(cfg) {
+  const p = PROVIDERS[cfg.provider] || {};
+  let base = String(cfg.baseUrl || p.baseUrl || '').trim().replace(/\/+$/, '');
+  if (base && !/^https?:\/\//i.test(base)) base = 'http://' + base;
+  if (p.apiSuffix && !/\/(api|v1)(\/v1)?$/i.test(base)) base += p.apiSuffix;
+  return base;
+}
+
+/** Netzwerkfehler in eine verständliche Meldung übersetzen */
+function networkError(cfg, base, err) {
+  if (err?.name === 'AbortError') return err;
+  const name = PROVIDERS[cfg.provider]?.name || 'KI-Server';
+  if (location.protocol === 'https:' && /^http:/i.test(base)) {
+    return new Error(`${name} ist nur über http:// erreichbar, AleNote läuft hier aber über https:// – der Browser blockiert das. Stelle die KI hinter deinen Reverse-Proxy (https://…) und trage diese Adresse ein.`);
+  }
+  if (cfg.provider === 'ollama') return new Error(`Ollama unter ${base} nicht erreichbar. Läuft Ollama, stimmt die Adresse, und ist OLLAMA_ORIGINS="*" gesetzt? (Ohne diese Einstellung blockt Ollama Anfragen aus Apps.)`);
+  if (cfg.provider === 'openwebui') return new Error(`Open WebUI unter ${base} nicht erreichbar. Stimmt die Adresse (gleiche wie im Browser, ohne /chat …)? Falls du CORS_ALLOW_ORIGIN eingeschränkt hast: auf * setzen.`);
+  return new Error(`${name} unter ${base} nicht erreichbar (${err?.message || err}). Adresse prüfen – bei selbst gehosteten Servern auch die CORS-Einstellung.`);
+}
+
+/** Installierte Modelle abfragen (OpenAI-Format: GET /models → { data: [{ id }] }) */
+export async function listModels(cfg) {
+  const base = baseUrlOf(cfg);
+  const headers = {};
+  if (cfg.apiKey) headers.Authorization = 'Bearer ' + cfg.apiKey;
+  let res;
+  try { res = await fetch(base + '/models', { headers, signal: AbortSignal.timeout(15e3) }); }
+  catch (err) { throw networkError(cfg, base, err); }
+  if (!res.ok) throw new Error(await errorText(res));
+  const body = await res.json();
+  const list = (body.data || body.models || []).map((m) => m.id || m.name || m.model).filter(Boolean);
+  return [...new Set(list)].sort((a, b) => a.localeCompare(b));
+}
 
 /** Liest einen SSE-Stream und ruft onEvent(data) für jede "data:"-Zeile auf */
 async function readSSE(res, onEvent) {
@@ -80,9 +122,10 @@ async function errorText(res) {
   let msg = `${res.status} ${res.statusText}`;
   try {
     const body = await res.json();
-    msg = body.error?.message || body.error?.type || body.message || (typeof body.error === 'string' ? body.error : msg);
+    msg = body.error?.message || body.error?.type || body.message || body.detail || (typeof body.error === 'string' ? body.error : msg);
   } catch {}
   if (res.status === 401 || res.status === 403) msg = 'API-Schlüssel ungültig oder ohne Berechtigung – ' + msg;
+  if (res.status === 404 || res.status === 405) msg += ' – Adresse oder Modellname prüfen';
   if (res.status === 429) msg = 'Zu viele Anfragen oder Guthaben aufgebraucht – ' + msg;
   return msg;
 }
@@ -101,7 +144,7 @@ export async function streamChat(cfg, { system, messages, onText, signal }) {
   if (!cfg.apiKey && !p.noKey && !p.optionalKey) throw new Error(`Kein API-Schlüssel für ${p.name} hinterlegt (Einstellungen → KI)`);
   const model = cfg.model || p.defaultModel;
   if (!model) throw new Error('Kein Modell angegeben (Einstellungen → KI)');
-  const base = (cfg.baseUrl || p.baseUrl).replace(/\/+$/, '');
+  const base = baseUrlOf(cfg);
   let text = '';
   let note = '';
   const push = (t) => { if (t) { text += t; onText?.(t, text); } };
@@ -154,10 +197,7 @@ export async function streamChat(cfg, { system, messages, onText, signal }) {
   const res = await fetch(base + '/chat/completions', {
     method: 'POST', headers, signal,
     body: JSON.stringify({ model, stream: true, messages: [...(system ? [{ role: 'system', content: system }] : []), ...messages] })
-  }).catch((e) => {
-    if (cfg.provider === 'ollama') throw new Error('Ollama nicht erreichbar. Läuft Ollama? (OLLAMA_ORIGINS="*" setzen, damit die App zugreifen darf)');
-    throw e;
-  });
+  }).catch((e) => { throw networkError(cfg, base, e); });
   if (!res.ok) throw new Error(await errorText(res));
   await readSSE(res, (ev) => {
     push(ev.choices?.[0]?.delta?.content);

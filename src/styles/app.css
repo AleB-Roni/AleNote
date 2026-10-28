@@ -974,6 +974,7 @@ body.ai-open .main .titlebar-spacer { width: 0; }
 .md a { color: var(--accent); }
 .ai-compose { display: flex; align-items: flex-end; gap: 6px; padding: 10px 12px 12px; border-top: 1px solid var(--border); }
 .ai-input { flex: 1; resize: none; min-height: 40px; max-height: 160px; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--border); background: var(--bg); outline: none; font-size: 13.5px; line-height: 1.45; user-select: text; }
+.ai-help { display: block; margin-top: 4px; line-height: 1.4; }
 .ai-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 20%, transparent); }
 .ai-send { width: 40px; height: 40px; flex-shrink: 0; display: grid; place-items: center; border-radius: 12px; color: #fff; background: linear-gradient(135deg, var(--accent), var(--accent-2)); transition: transform .15s var(--spring); }
 .ai-send:active { transform: scale(.92); }
