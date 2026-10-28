@@ -207,9 +207,20 @@ export async function streamChat(cfg, { system, messages, onText, signal }) {
     body: JSON.stringify({ model, stream: true, messages: [...(system ? [{ role: 'system', content: system }] : []), ...messages] })
   }).catch((e) => { throw networkError(cfg, base, e); });
   if (!res.ok) throw new Error(await errorText(res));
+  // Denkende Modelle (Qwen3, DeepSeek-R1 …) schreiben ihren Denkprozess in <think>…</think> – nicht anzeigen
+  let raw = '';
+  const pushVisible = (t) => {
+    if (!t) return;
+    raw += t;
+    const visible = raw.replace(/<think>[\s\S]*?<\/think>\s*/g, '').replace(/<think>[\s\S]*$/, '').replace(/^\s+/, '')
+      .replace(/<(t(h(i(nk?)?)?)?)?$/, ''); // angefangenes „<think“ am Ende noch zurückhalten
+    if (visible.length > text.length && visible.startsWith(text)) push(visible.slice(text.length));
+  };
   await readSSE(res, (ev) => {
-    push(ev.choices?.[0]?.delta?.content);
+    pushVisible(ev.choices?.[0]?.delta?.content);
     if (ev.choices?.[0]?.finish_reason === 'content_filter') note = 'Die Antwort wurde vom Inhaltsfilter blockiert.';
   });
+  const final = raw.replace(/<think>[\s\S]*?<\/think>\s*/g, '').replace(/<think>[\s\S]*$/, '').replace(/^\s+/, '');
+  if (final.length > text.length && final.startsWith(text)) push(final.slice(text.length));
   return { text, note };
 }
