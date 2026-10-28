@@ -543,6 +543,12 @@ body.no-glass .menu { backdrop-filter: none; background: var(--bg-2); }
   opacity: 0; pointer-events: none; transform: translateY(4px) scale(.97); transition: opacity .14s, transform .18s var(--ease);
 }
 .inline-toolbar.visible { opacity: 1; pointer-events: auto; transform: none; }
+.tb-type { display: inline-flex; align-items: center; gap: 4px; height: 30px; padding: 0 6px 0 9px; border-radius: 7px; color: var(--text); font-size: 13px; font-weight: 550; white-space: nowrap; max-width: 150px; }
+.tb-type[hidden] { display: none; }
+.tb-type:hover { background: var(--bg-hover); }
+.tb-type .tb-type-label { overflow: hidden; text-overflow: ellipsis; }
+.tb-type .icon { color: var(--text-3); }
+.tb-type[hidden] + .tb-sep { display: none; }
 .tb-btn { width: 30px; height: 30px; display: grid; place-items: center; border-radius: 7px; color: var(--text-2); transition: background .1s, color .1s; }
 .tb-btn:hover { background: var(--bg-hover); color: var(--text); }
 .tb-btn.active { color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); }
@@ -1350,6 +1356,8 @@ body.block-selecting, body.block-selecting * { user-select: none !important; cur
 .multi-bar button:hover:not(:disabled) { background: var(--bg-hover); color: var(--text); }
 .multi-bar button:disabled { opacity: .4; cursor: default; }
 .multi-bar .multi-ai { color: var(--accent); font-weight: 600; }
+.multi-bar .multi-turn { color: var(--text); font-weight: 550; gap: 5px; }
+.multi-bar .multi-turn span { max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .multi-count { font-size: 12.5px; color: var(--text-2); padding: 0 8px 0 6px; font-variant-numeric: tabular-nums; }
 .multi-sep { width: 1px; height: 18px; background: var(--border); margin: 0 3px; }
 body.boot-failed #app { opacity: 1; display: block; overflow: auto; }

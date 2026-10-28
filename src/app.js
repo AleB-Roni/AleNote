@@ -28,6 +28,7 @@ import { openTrash } from './ui/trash.js';
 import { initSubpages } from './ui/subpages.js';
 import { LiveService } from './core/live.js';
 import { HomeView } from './ui/home.js';
+import { turnInto, targetIds, splitLines, moveToSubpage } from './ui/transform.js';
 import { initEmojis, emojiNode, customEmojiHtml, CUSTOM_RE } from './core/emoji.js';
 import { emojiPicker } from './ui/pickers.js';
 import { childFolder, parentOf, isNotePath, remap as remapPath, remapPageLinks } from './core/pages.js';
@@ -662,11 +663,26 @@ class App {
     r.registerCommand({ id: 'core.toText', name: 'In Text umwandeln', icon: 'text', shortcut: 'Ctrl+Alt+0', group: 'Formatieren', when: hasNote, run: () => this.convertFocused('paragraph') });
     r.registerCommand({ id: 'core.toTodo', name: 'In To-do umwandeln', icon: 'checkSquare', shortcut: 'Ctrl+Alt+T', group: 'Formatieren', when: hasNote, run: () => this.convertFocused('todo') });
     r.registerCommand({ id: 'core.toBullet', name: 'In Aufzählung umwandeln', icon: 'list', shortcut: 'Ctrl+Alt+L', group: 'Formatieren', when: hasNote, run: () => this.convertFocused('bullet') });
+    // Wie in Google Docs / Docmost
+    r.registerCommand({ id: 'core.toNumbered', name: 'In nummerierte Liste umwandeln', icon: 'listOrdered', shortcut: 'Ctrl+Shift+7', group: 'Formatieren', when: hasNote, run: () => this.convertFocused('numbered') });
+    r.registerCommand({ id: 'core.toBullet2', name: 'In Aufzählung umwandeln (Docs)', icon: 'list', shortcut: 'Ctrl+Shift+8', group: 'Formatieren', when: hasNote, run: () => this.convertFocused('bullet') });
+    r.registerCommand({ id: 'core.toTodo2', name: 'In To-do-Liste umwandeln (Docs)', icon: 'checkSquare', shortcut: 'Ctrl+Shift+9', group: 'Formatieren', when: hasNote, run: () => this.convertFocused('todo') });
+    r.registerCommand({ id: 'core.toQuote', name: 'In Zitat umwandeln', icon: 'quote', shortcut: 'Ctrl+Alt+Q', group: 'Formatieren', when: hasNote, run: () => this.convertFocused('quote') });
+    r.registerCommand({ id: 'core.toCallout', name: 'In Hinweisbox umwandeln', icon: 'callout', group: 'Formatieren', when: hasNote, run: () => this.convertFocused('callout') });
+    r.registerCommand({ id: 'core.toToggle', name: 'In Aufklappbar umwandeln', icon: 'toggle', group: 'Formatieren', when: hasNote, run: () => this.convertFocused('toggle') });
+    r.registerCommand({ id: 'core.splitLines', name: 'Zeilen in einzelne Blöcke aufteilen', icon: 'list', group: 'Formatieren', when: hasNote, run: () => { const ids = targetIds(this.editor); if (ids.length) splitLines(this.editor, ids); } });
+    r.registerCommand({ id: 'core.toSubpage', name: 'Block(e) in neue Unterseite verschieben', icon: 'files', group: 'Formatieren', when: hasNote, run: () => { const ids = targetIds(this.editor); if (ids.length) moveToSubpage(this.editor, ids); } });
   }
 
+  /** Fokussierten Block – oder alle markierten Blöcke – umwandeln */
   convertFocused(type) {
-    const id = document.activeElement?.closest?.('.block')?.dataset.id;
-    if (id) this.editor.convertBlock(id, type);
+    const ed = this.editor;
+    const ids = targetIds(ed);
+    if (!ids.length) return;
+    const b = ed.block(ids[0]);
+    // Ein Block ohne Zeilenumbrüche: Cursor behalten (direkt umwandeln)
+    if (ids.length === 1 && !ed.multiSelected?.size && b && ed.def(b.type)?.text && b.type !== 'code' && type !== 'code' && !/<br/i.test(b.data.text || '')) ed.convertBlock(ids[0], type);
+    else turnInto(ed, ids, type);
   }
 
   moveFocusedBlock(dir) {

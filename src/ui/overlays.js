@@ -79,6 +79,7 @@ export function contextMenu(items, pos, { className = '' } = {}) {
   const menu = h('div.menu' + (className ? '.' + className : ''));
   const build = (container, list) => {
     for (const item of list) {
+      if (!item) continue;
       if (item === '-') { container.append(h('div.menu-sep')); continue; }
       if (item.header) { container.append(h('div.menu-header', { text: item.header })); continue; }
       const row = h('button.menu-item' + (item.danger ? '.danger' : '') + (item.active ? '.active' : ''), {},

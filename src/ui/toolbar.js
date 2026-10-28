@@ -1,7 +1,8 @@
 // Schwebende Formatierungsleiste bei Textauswahl
 import { h } from '../core/utils.js';
 import { icon } from './icons.js';
-import { prompt } from './overlays.js';
+import { prompt, contextMenu } from './overlays.js';
+import { turnIntoItems, transformItems } from './transform.js';
 import { BLOCK_COLORS } from './editor.js';
 
 export class InlineToolbar {
@@ -13,7 +14,12 @@ export class InlineToolbar {
       b.addEventListener('mousedown', (e) => { e.preventDefault(); run(b); });
       return b;
     };
+    // Blocktyp: markierten Absatz z.B. in eine Überschrift oder Liste umwandeln
+    this.typeBtn = h('button.tb-type', { title: 'Umwandeln in … (Überschrift, Liste, To-do …)' }, h('span.tb-type-label'), icon('chevronDown', 12));
+    this.typeBtn.addEventListener('mousedown', (e) => { e.preventDefault(); this.typeMenu(); });
     this.el.append(
+      this.typeBtn,
+      h('div.tb-sep'),
       btn('bold', 'Fett (Strg+B)', () => this.exec('bold')),
       btn('italic', 'Kursiv (Strg+I)', () => this.exec('italic')),
       btn('underline', 'Unterstrichen (Strg+U)', () => this.exec('underline')),
@@ -58,9 +64,27 @@ export class InlineToolbar {
     if (y < 48 || document.body.classList.contains('touch')) y = rect.bottom + 14;
     this.el.style.left = x + 'px';
     this.el.style.top = y + 'px';
+    const b = this.block();
+    this.typeBtn.querySelector('.tb-type-label').textContent = (b && this.editor.def(b.type)?.name) || 'Text';
+    this.typeBtn.hidden = !b || !this.editor.def(b.type)?.text;
     for (const [cmd, q] of [['bold', 'bold'], ['italic', 'italic'], ['underline', 'underline'], ['strike', 'strikeThrough']]) {
       this.el.querySelector(`[data-cmd="${cmd}"]`).classList.toggle('active', document.queryCommandState(q));
     }
+  }
+
+  /** Block, in dem gerade Text markiert ist */
+  block() {
+    const id = this.editable()?.closest('.block')?.dataset.id;
+    return id ? this.editor.block(id) : null;
+  }
+
+  typeMenu() {
+    const b = this.block();
+    if (!b) return;
+    const more = transformItems(this.editor, [b.id]).filter((i) => !/Farbe|Duplizieren/.test(i.label));
+    const r = this.typeBtn.getBoundingClientRect();
+    this.hide();
+    contextMenu([{ header: 'Umwandeln in' }, ...turnIntoItems(this.editor, [b.id], b.type), ...(more.length ? ['-', ...more] : [])], { x: r.left, y: r.bottom + 4 });
   }
 
   hide() {

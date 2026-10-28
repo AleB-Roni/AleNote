@@ -3,6 +3,7 @@
 // und frei beweglichen Bildern (floats): { id, src, x, y, w, rot, z }
 
 import { emojiNode } from '../core/emoji.js';
+import { turnIntoItems, transformItems, indentBlocks, duplicateBlocks, colorBlocks } from './transform.js';
 import { h, uid, debounce, setPath, placeCaret, setCaretOffset, getCaretOffset, isCaretAtStart, isCaretAtEnd,
   isCaretOnFirstLine, isCaretOnLastLine, splitAtCaret, isEmptyHtml, getCaretClientRect, sanitizeHtml, clamp, stripHtml, copyText } from '../core/utils.js';
 import { History } from '../core/history.js';
@@ -383,14 +384,35 @@ export class Editor {
     this.multiBar?.remove();
     const bar = h('div.multi-bar', {},
       h('span.multi-count', { text: n === 1 ? '1 Block' : `${n} Blöcke` }),
+      h('button.multi-turn', { title: 'Umwandeln in … (z.B. Überschrift, Aufzählung, To-do)', disabled: !n, onclick: (e) => contextMenu([{ header: 'Umwandeln in' }, ...turnIntoItems(this, this.multiIds(), this.commonType())], e.currentTarget) }, icon('refresh', 14), h('span', { text: this.def(this.commonType())?.name || 'Umwandeln' }), icon('chevronDown', 12)),
       this.app.ai ? h('button.multi-ai', { title: 'Mit KI bearbeiten (Strg+J)', disabled: !n, onclick: (e) => contextMenu(this.app.ai.multiMenuItems(), e.currentTarget) }, icon('sparkles', 15), h('span', { text: 'KI' })) : null,
       h('button', { title: 'Kopieren (Strg+C)', disabled: !n, onclick: () => this.copyMulti() }, icon('copy', 15)),
       h('button', { title: 'Löschen (Entf)', disabled: !n, onclick: () => this.deleteMulti() }, icon('trash', 15)),
+      h('button', { title: 'Mehr: zusammenführen, sortieren, als Tabelle, Farbe …', disabled: !n, onclick: (e) => contextMenu(transformItems(this, this.multiIds(), { colors: (ids) => this.colorItems(ids) }), e.currentTarget) }, icon('more', 15)),
       h('span.multi-sep'),
       h('button', { title: 'Auswahl aufheben (Esc)', onclick: () => this.clearMulti() }, icon('x', 15)));
     this.multiBar = bar;
     document.body.append(bar);
     this.placeMultiBar();
+  }
+
+  /** Markierte Blöcke in Dokument-Reihenfolge */
+  multiIds() { return this.note.blocks.filter((b) => this.multiSelected?.has(b.id)).map((b) => b.id); }
+
+  /** Gemeinsamer Typ der markierten Blöcke (oder null bei gemischter Auswahl) */
+  commonType() {
+    const types = new Set(this.multiIds().map((id) => this.block(id)?.type));
+    return types.size === 1 ? [...types][0] : null;
+  }
+
+  colorItems(ids) {
+    const cur = ids.length === 1 ? this.block(ids[0])?.color || '' : null;
+    return [
+      { header: 'Textfarbe' },
+      ...BLOCK_COLORS.map((c) => ({ label: c.name, swatch: c.id ? `var(--c-${c.id})` : 'var(--text)', active: cur === c.id, run: () => colorBlocks(this, ids, c.id) })),
+      { header: 'Hintergrund' },
+      ...BLOCK_COLORS.filter((c) => c.id).map((c) => ({ label: c.name, swatch: `var(--bg-${c.id})`, active: cur === 'bg-' + c.id, run: () => colorBlocks(this, ids, 'bg-' + c.id) }))
+    ];
   }
 
   placeMultiBar() {
@@ -830,6 +852,8 @@ export class Editor {
       if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); this.deleteMulti(); }
       else if (mod && (k === 'c' || k === 'x')) { e.preventDefault(); this.copyMulti(k === 'x'); }
       else if (mod && k === 'a') e.preventDefault();
+      else if (e.key === 'Tab') { e.preventDefault(); indentBlocks(this, this.multiIds(), e.shiftKey ? -1 : 1); }
+      else if (mod && k === 'd') { e.preventDefault(); duplicateBlocks(this, this.multiIds()); }
       else if (e.key === 'Escape' || (!mod && !['Shift', 'Control', 'Alt', 'Meta'].includes(e.key))) {
         if (e.key === 'Escape') e.preventDefault();
         const first = [...this.multiSelected][0];
@@ -1128,20 +1152,18 @@ export class Editor {
     if (!b) return;
     const inMulti = this.multiSelected?.has(id) && this.multiSelected.size > 1;
     if (!inMulti) this.selectBlock(id);
-    const textTypes = [...this.registry.blocks.values()].filter((d) => d.text && d.slash !== false);
+    const ids = inMulti ? this.multiIds() : [id];
+    const canTurn = this.def(b.type)?.text || b.type === 'table';
+    const more = transformItems(this, ids);
     contextMenu([
       { header: inMulti ? `${this.multiSelected.size} Blöcke markiert` : this.def(b.type)?.name || b.type },
-      { label: 'Umwandeln in', icon: 'refresh', submenu: textTypes.map((d) => ({ label: d.name, icon: d.icon, active: d.type === b.type, run: () => this.convertBlock(id, d.type) })) },
-      { label: 'Farbe', icon: 'palette', submenu: [
-        { header: 'Textfarbe' },
-        ...BLOCK_COLORS.map((c) => ({ label: c.name, swatch: c.id ? `var(--c-${c.id})` : 'var(--text)', active: (b.color || '') === c.id, run: () => this.setColor(id, c.id) })),
-        { header: 'Hintergrund' },
-        ...BLOCK_COLORS.filter((c) => c.id).map((c) => ({ label: c.name, swatch: `var(--bg-${c.id})`, active: b.color === 'bg-' + c.id, run: () => this.setColor(id, 'bg-' + c.id) }))
-      ] },
+      canTurn ? { label: 'Umwandeln in', icon: 'refresh', submenu: turnIntoItems(this, ids, inMulti ? this.commonType() : b.type) } : null,
+      { label: 'Farbe', icon: 'palette', submenu: this.colorItems(ids) },
+      more.length ? { label: 'Bearbeiten', icon: 'edit', submenu: more } : null,
       '-',
       ...(this.app.ai ? [{ label: 'KI', icon: 'sparkles', submenu: this.app.ai.blockMenuItems(id) }] : []),
       { label: 'Mehrere markieren', icon: 'checkSquare', run: () => this.startMultiMode(id) },
-      { label: 'Duplizieren', icon: 'copy', shortcut: 'Ctrl+D', run: () => this.duplicateBlock(id) },
+      { label: 'Duplizieren', icon: 'copy', shortcut: 'Ctrl+D', run: () => (inMulti ? duplicateBlocks(this, ids) : this.duplicateBlock(id)) },
       { label: 'Nach oben', icon: 'chevronUp', run: () => { const i = this.index(id); if (i > 0) this.moveBlock(id, i - 1); } },
       { label: 'Nach unten', icon: 'chevronDown', run: () => { const i = this.index(id); if (i < this.note.blocks.length - 1) this.moveBlock(id, i + 2); } },
       '-',

@@ -83,6 +83,12 @@ Die portable EXE kann sich nicht selbst aktualisieren.
 
 ## Funktionen
 
+- **Text umwandeln & bearbeiten** (wie in Docmost/Notion):
+  - **Text markieren** → in der Formatierungsleiste ganz links auf den Blocktyp (z.B. „Text ▾“) → *Überschrift 1–3, Aufzählung, Nummerierte Liste, To-do, Zitat, Hinweisbox, Aufklappbar, Code*.
+  - **Mehrere Blöcke markieren** (mit der Maus über mehrere Absätze ziehen, Shift+Klick, auf dem Handy ⋮⋮ → „Mehrere markieren“) → in der Leiste „Umwandeln“ – alle auf einmal. Absätze mit mehreren Zeilen werden dabei automatisch in einzelne Listenpunkte aufgeteilt.
+  - **Mehr (⋯)**: Zeilen aufteilen, zu einem Block zusammenführen, sortieren (A→Z/Z→A), **als Tabelle** (Spalten aus „;“, Tab oder „|“) bzw. **Tabelle → Liste**, Groß-/Kleinschreibung, alle To-dos abhaken, ein-/ausrücken, Farbe, duplizieren und **in eine neue Unterseite verschieben**.
+  - Kürzel (auch für mehrere markierte Blöcke): Strg+Alt+0…3 (Text/Überschriften), **Strg+Shift+7/8/9** (nummeriert/Aufzählung/To-do), Strg+Alt+Q (Zitat), Tab/Shift+Tab (ein-/ausrücken), Strg+D (duplizieren). Alles mit Strg+Z rückgängig.
+
 - **Startseite** (Logo oben links, „Startseite“ in der Seitenleiste oder Strg+Shift+H): Begrüßung mit Tagesüberblick, Suche, Schnellzugriffe (Neue Seite, Schnellnotiz, Tagesnotiz, Vorlage, Kalender, KI), **Favoriten** (mit ＋ hinzufügen, mit ✕ entfernen), **zuletzt geöffnete und zuletzt bearbeitete Seiten**, fällige und überfällige **Aufgaben zum Abhaken**, **Termine** der nächsten 7 Tage aus deinen Kalender-Abos, eine **Schnellnotiz** direkt auf der Seite und **„Wiederentdecken“** (jeden Tag eine ältere Seite). Über ⚙ lassen sich Bereiche ausblenden und festlegen, ob AleNote mit der Startseite oder der zuletzt geöffneten Seite startet.
 
 - **Ordnerstruktur**: Ordner/Unterordner, Notizen per Drag & Drop verschieben, Inline-Umbenennen (F2), Favoriten ★, Rechtsklick-Menüs
