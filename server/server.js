@@ -228,6 +228,29 @@ route('DELETE', '/api/sync/note', async (req, ctx, q) => {
   return announce(req, ctx, await vaultOf(ctx.user.id).remove(q.get('path'), { baseRev: base == null ? null : Number(base), force: q.get('force') === '1' }));
 });
 
+// ---- KI-Einstellungen des Kontos (API-Schlüssel, Modelle, eigene Prompts) ----
+// Liegen getrennt von den Notizen in <Daten>/vaults/<Benutzer>/ai-config.json – also nicht im
+// Notiz-Abgleich und nicht im Versionsverlauf. Wird mit dem Konto gelöscht.
+const aiConfigFile = (userId) => path.join(DATA, 'vaults', userId, 'ai-config.json');
+
+route('GET', '/api/me/ai', async (req, ctx) => {
+  try { return JSON.parse(await fs.readFile(aiConfigFile(ctx.user.id), 'utf8')); }
+  catch { return { config: null, updated: 0 }; }
+});
+
+route('PUT', '/api/me/ai', async (req, ctx) => {
+  const { config, updated } = await readJson(req);
+  if (!config || typeof config !== 'object' || Array.isArray(config)) throw A.httpError(400, 'config fehlt');
+  const body = JSON.stringify({ config, updated: Number(updated) || Date.now() });
+  if (body.length > 512 * 1024) throw A.httpError(413, 'KI-Einstellungen zu groß');
+  const file = aiConfigFile(ctx.user.id);
+  await fs.mkdir(path.dirname(file), { recursive: true });
+  await fs.writeFile(file + '.tmp', body, { encoding: 'utf8', mode: 0o600 });
+  await fs.rename(file + '.tmp', file);
+  live.send(ctx.user.id, 'aiconfig', { updated: JSON.parse(body).updated }, req.headers['x-alenote-client'] || null);
+  return { ok: true, updated: JSON.parse(body).updated };
+});
+
 // ---- Live-Bearbeitung ----
 // Verbindung: GET /api/live (Server-Sent Events, siehe lib/live.js und HTTP-Server unten)
 route('POST', '/api/live/presence', async (req, ctx) => {

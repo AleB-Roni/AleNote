@@ -42,6 +42,15 @@ Jeder Eintrag hat `kind` (`note`, `folder`, `asset`), `rev` (Version), `hash` (S
 
 Die Referenz-Implementierung ist [`sync.js`](../sync.js).
 
+## KI-Einstellungen des Kontos
+
+| Methode | Pfad | Beschreibung |
+|---|---|---|
+| GET | `/api/me/ai` | `{ config, updated }` – API-Schlüssel, Modelle, Adressen, eigene Prompts (oder `config: null`) |
+| PUT | `/api/me/ai` | `{ config, updated }` speichern; andere Geräte bekommen das Live-Ereignis `aiconfig` |
+
+Gespeichert in `<Daten>/vaults/<Benutzer>/ai-config.json`, nicht im Notiz-Abgleich und nicht im Versionsverlauf.
+
 ## Live-Bearbeitung
 
 | Methode | Pfad | Beschreibung |

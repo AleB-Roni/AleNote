@@ -145,6 +145,9 @@ export class LiveService {
       this.sendPresence();
       // Erst die geöffnete Notiz zusammenführen, dann verpasste Änderungen normal nachholen
       Promise.resolve(this.app.currentPath ? this.prepare(this.app.currentPath) : null).finally(() => this.api.syncNow?.());
+      this.app.ai?.sync?.pull();
+    } else if (event === 'aiconfig') {
+      this.app.ai?.sync?.pull(); // KI-Einstellungen auf einem anderen Gerät geändert
     } else if (event === 'presence') {
       this.presence = data.list || [];
       this.render();

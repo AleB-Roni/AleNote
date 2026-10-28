@@ -12,7 +12,29 @@ export function renderAISettings(app, page, rerender, { shortcutRecorder, toggle
   const section = (t, d) => h('div.set-section', {}, h('h4', { text: t }), d ? h('p.muted.small', { html: d }) : null);
 
   // ---------- Anbieter ----------
-  page.append(section('KI-Anbieter', 'Hinterlege einen API-Schlüssel für mindestens einen Anbieter. Die Schlüssel bleiben <b>nur auf diesem Gerät</b> und werden nicht synchronisiert. Anfragen gehen direkt von AleNote zum Anbieter.'));
+  const loggedIn = !!app.account?.account;
+  const synced = loggedIn && cfg.syncAccount !== false;
+  page.append(section('KI-Anbieter', 'Hinterlege einen API-Schlüssel für mindestens einen Anbieter. ' + (synced
+    ? 'Schlüssel, Modelle und eigene Prompts werden <b>mit deinem Konto</b> auf deinem AleNote-Server gespeichert und erscheinen automatisch auf deinen anderen Geräten.'
+    : 'Die Schlüssel bleiben <b>nur auf diesem Gerät</b>.') + ' Anfragen gehen direkt von AleNote zum Anbieter.'));
+  if (loggedIn) {
+    const st = h('span.small.muted', { text: ai.sync.lastError ? '✗ ' + ai.sync.lastError : '' });
+    const sw = h('button.switch' + (synced ? '.on' : ''), { role: 'switch' });
+    sw.addEventListener('click', async () => {
+      cfg.syncAccount = !sw.classList.contains('on');
+      ai.save();
+      if (cfg.syncAccount) {
+        st.textContent = 'Gleiche ab …';
+        await ai.sync.pull();
+        await ai.sync.push().catch((e) => { ai.sync.lastError = e.message; });
+        toast(ai.sync.lastError ? 'KI-Einstellungen: ' + ai.sync.lastError : 'KI-Einstellungen werden jetzt mit dem Konto synchronisiert', { type: ai.sync.lastError ? 'error' : 'success' });
+      }
+      rerender();
+    });
+    page.append(h('div.set-row', {}, h('div.set-label', {}, h('div', { text: 'Mit Konto synchronisieren' }),
+      h('div.muted.small', { text: 'API-Schlüssel, Modelle, Server-Adressen und eigene Prompts auf allen Geräten. Gespeichert getrennt von den Notizen (nicht im Versionsverlauf).' }), st),
+    h('div.set-control', {}, sw)));
+  }
   page.append(h('div.set-row', {}, h('div.set-label', {}, h('div', { text: 'Standard-Anbieter' }), h('div.muted.small', { text: 'Für Prompts ohne eigenen Anbieter und für den Chat' })),
     h('div.set-control', {}, select(Object.entries(PROVIDERS).map(([id, p]) => [id, p.name + (ai.isConfigured(id) ? ' ✓' : '')]), cfg.defaultProvider, (v) => { cfg.defaultProvider = v; ai.save(); rerender(); }))));
 

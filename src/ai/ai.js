@@ -4,6 +4,7 @@
 //   scope:  'auto' (Markierung → Block → Seite) | 'selection' | 'block' | 'page'
 //   output: 'replace' (ersetzen) | 'below' (darunter einfügen) | 'chat' (im Chat anzeigen)
 
+import { AISync } from './ai-sync.js';
 import { h, uid, stripHtml, escapeHtml, copyText } from '../core/utils.js';
 import { icon } from '../ui/icons.js';
 import { toast, popover, closeMenu } from '../ui/overlays.js';
@@ -35,6 +36,7 @@ export class AIManager {
   constructor(app) {
     this.app = app;
     this.chat = new ChatPanel(app, this);
+    this.sync = new AISync(app, this);
   }
 
   // ---------- Einstellungen ----------
@@ -46,7 +48,12 @@ export class AIManager {
     if (!s.ai.defaultProvider) s.ai.defaultProvider = 'anthropic';
     return s.ai;
   }
-  save() { this.app.saveSettings({ ai: this.cfg }); this.registerAll(); }
+  save() {
+    this.sync.touch();
+    this.app.saveSettings({ ai: this.cfg });
+    this.registerAll();
+    this.sync.schedulePush();
+  }
 
   providerConfig(id = this.cfg.defaultProvider, model) {
     const p = this.cfg.providers[id] || {};

@@ -80,6 +80,8 @@ class App {
 
     await safe('Konto', async () => { this.account = new AccountUI(this); await this.account.init(); });
     safe('Live', () => { this.live = new LiveService(this); this.live.init(); });
+    // KI-Einstellungen (Schlüssel, Modelle …) vom Konto holen
+    if (this.account?.account) safe('KI-Sync', () => this.ai?.sync?.pull());
     await safe('Updates', () => { this.updates = new UpdateUI(this); this.updates.init(); });
 
     let tree = [];
