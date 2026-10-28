@@ -20,7 +20,7 @@ function createBrowserFallback() {
   const tree = (dir) => {
     const out = [];
     for (const f of db.folders) if (dirOf(f) === dir) out.push({ type: 'folder', name: baseOf(f), path: f, children: tree(f) });
-    for (const [k, v] of Object.entries(db.files)) if (dirOf(k) === dir) out.push({ type: 'note', name: baseOf(k).slice(0, -EXT.length), path: k, icon: v.icon || '' });
+    for (const [k, v] of Object.entries(db.files)) if (dirOf(k) === dir) out.push({ type: 'note', name: baseOf(k).slice(0, -EXT.length), path: k, icon: v.icon || '', updated: Number(v.updated) || 0 });
     return out.sort((a, b) => (a.type === b.type ? a.name.localeCompare(b.name, 'de', { numeric: true }) : a.type === 'folder' ? -1 : 1));
   };
   const ok = (v) => Promise.resolve(v);

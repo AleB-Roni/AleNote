@@ -6,6 +6,19 @@ const FEED_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6', '#06
 const feedCache = new Map(); // url → { at, events, error }
 const timeOf = (d) => d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
 
+/** Termine aller Kalender-Abos in den nächsten Tagen (für die Startseite) */
+export async function upcomingEvents(app, days = 7) {
+  const feeds = ((await readSynced(app.api)).calendarFeeds || []).filter((f) => f.enabled !== false);
+  const from = parseDay(todayKey());
+  const to = new Date(from); to.setDate(to.getDate() + days);
+  const out = [];
+  await Promise.all(feeds.map(async (f, i) => {
+    const data = await loadFeed(app, f, false);
+    for (const e of expandEvents(data.events || [], from, to)) out.push({ ...e, color: f.color || FEED_COLORS[i % FEED_COLORS.length], feed: f.name || '' });
+  }));
+  return out.filter((e) => e.end > Date.now() || e.allDay).sort((a, b) => a.start - b.start);
+}
+
 /** Termine eines Abos laden (mit 15-Minuten-Zwischenspeicher) */
 async function loadFeed(app, feed, force) {
   const c = feedCache.get(feed.url);

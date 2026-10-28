@@ -23,7 +23,7 @@ export class Sidebar {
   build() {
     const app = this.app;
     this.el.innerHTML = '';
-    const brand = h('div.brand', {},
+    const brand = h('div.brand', { title: 'Startseite (Strg+Shift+H)', role: 'button', tabindex: 0, onclick: () => app.openHome(), onkeydown: (e) => { if (e.key === 'Enter') app.openHome(); } },
       h('div.brand-logo', { html: '<svg viewBox="0 0 32 32" width="22" height="22"><defs><linearGradient id="lg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="var(--accent)"/><stop offset="1" stop-color="var(--accent-2)"/></linearGradient></defs><rect x="2" y="2" width="28" height="28" rx="8" fill="url(#lg)"/><path d="M10 22 16 9l6 13M12.5 17h7" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>' }),
       h('span.brand-name', { text: 'AleNote' }));
 
@@ -32,12 +32,14 @@ export class Sidebar {
     this.searchInput.addEventListener('keydown', (e) => { if (e.key === 'Escape') { this.searchInput.value = ''; this.filter = ''; this.renderTree(); this.searchInput.blur(); } });
 
     const quick = h('div.sidebar-quick', {},
+      this.homeBtn = this.navButton('home', 'Startseite', 'Ctrl+Shift+H', () => app.openHome()),
       this.navButton('search', 'Suchen & Befehle', 'Ctrl+P', () => app.palette.open()),
       this.navButton('filePlus', 'Neue Notiz', 'Ctrl+N', () => app.createNote(this.contextFolder())),
       this.navButton('folderPlus', 'Neuer Ordner', 'Ctrl+Shift+N', () => app.createFolder(this.contextFolder())),
       this.navButton('zap', 'Schnellnotiz', app.hotkeys?.shortcutFor('core.quickNote') || '', () => app.quickNote()),
       this.calBtn = this.navButton('calendar', 'Kalender', app.hotkeys?.shortcutFor('core.calendar') || '', () => app.openCalendar()));
     this.calBtn.classList.add('nav-calendar');
+    this.homeBtn.classList.add('nav-home');
     this.calBadge = h('span.nav-badge');
     this.calBtn.querySelector('.nav-kbd').before(this.calBadge);
 

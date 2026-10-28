@@ -73,9 +73,9 @@ async function readTree(dir) {
     if (e.isDirectory()) {
       out.push({ type: 'folder', name: e.name, path: toRel(abs), children: await readTree(abs) });
     } else if (e.name.endsWith(NOTE_EXT)) {
-      let icon = '';
-      try { icon = JSON.parse(await fs.readFile(abs, 'utf8')).icon || ''; } catch {}
-      out.push({ type: 'note', name: e.name.slice(0, -NOTE_EXT.length), path: toRel(abs), icon });
+      let icon = '', updated = 0;
+      try { const d = JSON.parse(await fs.readFile(abs, 'utf8')); icon = d.icon || ''; updated = Number(d.updated) || 0; } catch {}
+      out.push({ type: 'note', name: e.name.slice(0, -NOTE_EXT.length), path: toRel(abs), icon, updated });
     }
   }
   out.sort((a, b) => (a.type === b.type ? a.name.localeCompare(b.name, 'de', { numeric: true }) : a.type === 'folder' ? -1 : 1));

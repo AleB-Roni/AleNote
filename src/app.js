@@ -27,6 +27,7 @@ import { moveToTrash, listTrash, restoreFromTrash, purgeExpired } from './core/t
 import { openTrash } from './ui/trash.js';
 import { initSubpages } from './ui/subpages.js';
 import { LiveService } from './core/live.js';
+import { HomeView } from './ui/home.js';
 import { initEmojis, emojiNode, customEmojiHtml, CUSTOM_RE } from './core/emoji.js';
 import { emojiPicker } from './ui/pickers.js';
 import { childFolder, parentOf, isNotePath, remap as remapPath, remapPageLinks } from './core/pages.js';
@@ -96,8 +97,8 @@ class App {
       await this.openNote(p);
     } else {
       const last = this.settings.lastOpen;
-      if (last && this.sidebar.allNotes().some((n) => n.path === last)) await this.openNote(last);
-      else this.showEmpty();
+      if (this.settings.startPage === 'last' && last && this.sidebar.allNotes().some((n) => n.path === last)) await this.openNote(last);
+      else await this.openHome();
     }
 
     document.addEventListener('keydown', (e) => {
@@ -114,6 +115,8 @@ class App {
       } catch (err) { toast('Schnellnotiz: ' + err.message, { type: 'error' }); }
     });
     this.events.on('todos:change', () => this.sidebar.updateBadge());
+    // Änderungszeit im Seitenbaum aktuell halten (Startseite: „Zuletzt bearbeitet“)
+    this.events.on('note:save', (data, path) => { const n = this.sidebar.allNotes().find((x) => x.path === path); if (n && data?.updated) n.updated = data.updated; });
     this.events.on('note:save', (data) => { if ((data.blocks || []).some((b) => b.type === 'todo' && b.data?.due)) this.sidebar.updateBadge(); });
     document.body.classList.add('ready');
     safe('Erinnerungen', () => this.reminders.start());
@@ -154,24 +157,42 @@ class App {
     root.append(this.sidebarEl, this.mainEl);
   }
 
+  /** Nichts geöffnet → Startseite */
   showEmpty() {
+    this.openHome();
+  }
+
+  // ---------- Startseite ----------
+  async openHome() {
+    if (this.home?.isOpen()) { this.home.load(); return; }
+    await this.saveNow();
     this.closeCalendar();
+    if (this.drawMode) this.toggleDrawMode(false);
     this.editor?.clearMulti();
     this.currentPath = null;
     this.editor.note = null;
-    this.editorScroll.innerHTML = '';
-    this.breadcrumbEl.innerHTML = '';
-    this.statusEl.textContent = '';
     this.mainEl.classList.remove('has-note');
-    this.editorScroll.append(h('div.empty-state', {},
-      h('div.empty-logo', { html: '<svg viewBox="0 0 32 32" width="72" height="72"><defs><linearGradient id="lg3" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="var(--accent)"/><stop offset="1" stop-color="var(--accent-2)"/></linearGradient></defs><rect x="2" y="2" width="28" height="28" rx="8" fill="url(#lg3)"/><path d="M10 22 16 9l6 13M12.5 17h7" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>' }),
-      h('h2', { text: 'Bereit für neue Ideen?' }),
-      h('p.muted', { text: 'Wähle links eine Notiz oder lege eine neue an.' }),
-      h('div.empty-actions', {},
-        h('button.btn.btn-primary', { onclick: () => this.createNote('') }, icon('filePlus', 16), 'Neue Notiz'),
-        h('button.btn', { onclick: () => openTemplatePicker(this, { mode: 'new' }) }, icon('layers', 16), 'Aus Vorlage'),
-        h('button.btn', { onclick: () => this.palette.open() }, icon('search', 16), 'Suchen')),
-      h('div.empty-hints', { html: '<span><kbd>Strg</kbd><kbd>N</kbd> Neue Notiz</span><span><kbd>Strg</kbd><kbd>P</kbd> Suchen & Befehle</span><span><kbd>/</kbd> Blöcke einfügen</span>' })));
+    this.mainEl.classList.add('home-mode');
+    this.breadcrumbEl.replaceChildren(h('span.crumb.current', {}, '🏠 Startseite'));
+    this.statusEl.textContent = '';
+    this.sidebar.setActive(null);
+    this.sidebar.el.querySelector('.nav-home')?.classList.add('active');
+    document.title = 'AleNote';
+    this.editorScroll.classList.remove('page-enter');
+    void this.editorScroll.offsetWidth;
+    this.editorScroll.classList.add('page-enter');
+    this.home = new HomeView(this);
+    this.setDrawer?.(false);
+    this.live?.prepare(null); // Live: auf keiner Notiz mehr
+    await this.home.mount(this.editorScroll);
+  }
+
+  closeHome() {
+    if (!this.home) return;
+    this.home.destroy();
+    this.home = null;
+    this.mainEl.classList.remove('home-mode');
+    this.sidebar.el.querySelector('.nav-home')?.classList.remove('active');
   }
 
   applySettings() {
@@ -230,6 +251,7 @@ class App {
     try { note = await api.readNote(path); }
     catch (err) { toast('Notiz konnte nicht geöffnet werden', { type: 'error' }); console.error(err); this.sidebar.refresh(); return; }
     this.closeCalendar();
+    this.closeHome();
     this.currentPath = path;
     this.mainEl.classList.add('has-note');
     this.editorScroll.classList.remove('page-enter');
@@ -249,6 +271,7 @@ class App {
   async openCalendar() {
     if (this.calendar?.isOpen()) return;
     await this.saveNow();
+    this.closeHome();
     if (this.drawMode) this.toggleDrawMode(false);
     this.editor.clearMulti();
     this.currentPath = null;
@@ -621,6 +644,7 @@ class App {
     r.registerCommand({ id: 'core.reload', name: 'AleNote neu laden', icon: 'refresh', shortcut: 'Ctrl+R', group: 'Allgemein', when: () => !inTable(), run: async () => { await this.saveNow(); location.reload(); } });
     r.registerCommand({ id: 'core.quickNote', name: 'Schnellnotiz', icon: 'zap', shortcut: 'Ctrl+Shift+Space', group: 'Notizen', run: () => this.quickNote() });
     r.registerCommand({ id: 'core.newSubpage', name: 'Neue Unterseite', icon: 'files', shortcut: 'Ctrl+Alt+U', group: 'Notizen', when: () => !!this.currentPath, run: () => this.createSubpage(this.currentPath) });
+    r.registerCommand({ id: 'core.home', name: 'Startseite', icon: 'home', shortcut: 'Ctrl+Shift+H', group: 'Navigation', run: () => this.openHome() });
     r.registerCommand({ id: 'core.calendar', name: 'Kalender öffnen', icon: 'calendar', shortcut: 'Ctrl+Alt+K', group: 'Navigation', run: () => this.openCalendar() });
     r.registerCommand({ id: 'core.todoDue', name: 'Fälligkeitsdatum festlegen', icon: 'calendar', shortcut: 'Ctrl+Shift+T', group: 'Bearbeiten', when: hasNote, run: () => this.setDueForFocused() });
     r.registerCommand({ id: 'core.exportPdf', name: 'Als PDF exportieren', icon: 'download', group: 'Export', when: hasNote, noteMenu: true, run: () => exportPdf(this) });

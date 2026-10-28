@@ -125,9 +125,9 @@ export async function createMobileApi({ web = false } = {}) {
       const p = join(dir, e.name);
       if (e.type === 'directory') out.push({ type: 'folder', name: e.name, path: p, children: await readTree(p) });
       else if (e.name.endsWith(NOTE_EXT)) {
-        let icon = '';
-        try { icon = JSON.parse(await vault.readText(p)).icon || ''; } catch {}
-        out.push({ type: 'note', name: e.name.slice(0, -NOTE_EXT.length), path: p, icon });
+        let icon = '', updated = 0;
+        try { const d = JSON.parse(await vault.readText(p)); icon = d.icon || ''; updated = Number(d.updated) || 0; } catch {}
+        out.push({ type: 'note', name: e.name.slice(0, -NOTE_EXT.length), path: p, icon, updated });
       }
     }
     return out.sort((a, b) => (a.type === b.type ? a.name.localeCompare(b.name, 'de', { numeric: true }) : a.type === 'folder' ? -1 : 1));

@@ -83,6 +83,8 @@ Die portable EXE kann sich nicht selbst aktualisieren.
 
 ## Funktionen
 
+- **Startseite** (Logo oben links, „Startseite“ in der Seitenleiste oder Strg+Shift+H): Begrüßung mit Tagesüberblick, Suche, Schnellzugriffe (Neue Seite, Schnellnotiz, Tagesnotiz, Vorlage, Kalender, KI), **Favoriten** (mit ＋ hinzufügen, mit ✕ entfernen), **zuletzt geöffnete und zuletzt bearbeitete Seiten**, fällige und überfällige **Aufgaben zum Abhaken**, **Termine** der nächsten 7 Tage aus deinen Kalender-Abos, eine **Schnellnotiz** direkt auf der Seite und **„Wiederentdecken“** (jeden Tag eine ältere Seite). Über ⚙ lassen sich Bereiche ausblenden und festlegen, ob AleNote mit der Startseite oder der zuletzt geöffneten Seite startet.
+
 - **Ordnerstruktur**: Ordner/Unterordner, Notizen per Drag & Drop verschieben, Inline-Umbenennen (F2), Favoriten ★, Rechtsklick-Menüs
 - **Block-Editor**: Text, Überschrift 1–3, Aufzählung, nummerierte Liste, To-do, Zitat, Hinweisbox, Aufklappbar, Code, Tabelle, Bild, Trennlinie, Inhaltsverzeichnis, Fortschrittsbalken
 - **„/“-Befehle**: In einer Zeile `/` tippen und filtern, z.B. `/tab`, `/code`, `/datum`
