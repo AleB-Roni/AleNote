@@ -6,6 +6,7 @@ import { PROVIDERS, streamChat } from './providers.js';
 import { blocksToMarkdown, mdToBlocks, mdInlineToHtml, cleanResult } from './markdown.js';
 import { findRelevantNotes, buildNotesContext } from './ask.js';
 import { actionsPrompt, parseActions, stripActions, runActions } from './actions.js';
+import { startDictation } from './dictate.js';
 
 /** Einfaches Markdown → HTML für die Anzeige (Chat & Vorschau) */
 export function renderMarkdown(md) {
@@ -77,12 +78,13 @@ export class ChatPanel {
   build() {
     this.el = h('aside.ai-panel');
     this.list = h('div.ai-messages');
-    this.input = h('textarea.ai-input', { rows: 1, placeholder: 'Frag die KI … (Enter senden, Shift+Enter neue Zeile)' });
+    this.input = h('textarea.ai-input', { rows: 1, placeholder: 'Frag die KI oder diktiere …' });
     this.input.addEventListener('input', () => this.autosize());
     this.input.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); this.sendFromInput(); }
       if (e.key === 'Escape') { e.preventDefault(); this.close(); }
     });
+    this.micBtn = h('button.ai-mic', { title: 'Diktieren – sprechen statt tippen', 'aria-label': 'Diktieren', onmousedown: (e) => e.preventDefault(), onclick: () => this.dictate() }, icon('mic', 17));
     this.sendBtn = h('button.ai-send', { title: 'Senden', onclick: () => (this.busy ? this.stop() : this.sendFromInput()) }, icon('send', 16));
     this.modelBtn = h('button.ai-model-btn', { onclick: (e) => this.pickModel(e.currentTarget) });
     this.ctxBtn = h('button.ai-ctx', { title: 'Was soll die KI mitbekommen?', onclick: (e) => this.pickMode(e.currentTarget) });
@@ -93,7 +95,7 @@ export class ChatPanel {
         h('button.icon-btn.tiny', { title: 'Einklappen (Strg+Shift+J)', onclick: () => this.close() }, icon('chevronRight', 15))),
       h('div.ai-panel-bar', {}, this.modelBtn, this.ctxBtn),
       this.list,
-      h('div.ai-compose', {}, this.input, this.sendBtn));
+      h('div.ai-compose', {}, this.input, this.micBtn, this.sendBtn));
     document.getElementById('app').append(this.el);
     this.app.events.on('note:open', () => this.renderMessages());
     if (this.opts.open) setTimeout(() => this.open(false), 0);
@@ -112,6 +114,7 @@ export class ChatPanel {
       { label: 'Alle Notizen (Frag deine Notizen)', icon: 'layers', active: this.mode === 'all', run: () => this.setMode('all') },
       { label: 'Ohne Kontext', icon: 'x', active: this.mode === 'none', run: () => this.setMode('none') },
       '-',
+      { label: 'Nach dem Diktieren gleich senden', icon: 'mic', active: !!this.opts.dictateSend, run: () => this.setOpt({ dictateSend: !this.opts.dictateSend }) },
       { label: 'KI darf Befehle ausführen', icon: 'zap', active: this.actionsOn, run: () => { this.setOpt({ actions: !this.actionsOn }); toast(this.actionsOn ? 'Die KI kann jetzt To-dos, Tabellen, Seiten usw. selbst anlegen' : 'Die KI schlägt Aktionen nur noch vor', { duration: 2500 }); } }
     ], anchor);
   }
@@ -219,6 +222,27 @@ export class ChatPanel {
     });
   }
 
+  /** Frage diktieren: Text landet im Eingabefeld (oder wird auf Wunsch gleich gesendet) */
+  async dictate() {
+    if (this.busy) return;
+    this.micBtn.classList.add('recording');
+    try {
+      await startDictation(this.app, {
+        onText: (t) => {
+          const before = this.input.value;
+          this.input.value = before + (before && !/\s$/.test(before) ? ' ' : '') + t;
+          this.autosize();
+          if (this.opts.dictateSend) this.sendFromInput();
+          else { this.input.focus(); this.input.setSelectionRange(this.input.value.length, this.input.value.length); }
+        }
+      });
+    } finally {
+      // Die Aufnahme läuft in einer eigenen Leiste weiter – Markierung entfernen, sobald sie zu ist
+      const done = () => (document.querySelector('.dictate-bar') ? setTimeout(done, 300) : this.micBtn.classList.remove('recording'));
+      done();
+    }
+  }
+
   sendFromInput() {
     const text = this.input.value.trim();
     if (!text || this.busy) return;
@@ -286,6 +310,7 @@ export class ChatPanel {
     this.sendBtn.append(icon(b ? 'stop' : 'send', 16));
     this.sendBtn.title = b ? 'Stopp' : 'Senden';
     this.sendBtn.classList.toggle('busy', b);
+    this.micBtn.disabled = b;
   }
 
   insertIntoNote(md) {
