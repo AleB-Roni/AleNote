@@ -31,7 +31,7 @@ Notizen liegen als Dateien im **Vault** (Standard: `Dokumente\AleNote`). Ordner 
 
 **Ordner sind auch Seiten**: Ein Klick auf einen Ordner öffnet ihn als Seite, in die du Text schreiben kannst (der Pfeil klappt ihn auf und zu). Der Ordnerinhalt erscheint darin als Unterseiten.
 
-**Unterseiten** (wie in Notion): Jede Seite kann weitere Seiten enthalten – über ＋ neben der Seite in der Seitenleiste, „/Unterseite“ im Text, „＋ Unterseite“ unten auf der Seite oder Strg+Alt+U. Seiten lassen sich auch per Ziehen auf eine andere Seite einsortieren. Gespeichert wird das als Ordner mit gleichem Namen neben der Seite (`Projekt.alenote` + `Projekt/…`); Umbenennen, Verschieben und Papierkorb nehmen die Unterseiten automatisch mit.
+**Unterseiten** (wie in Notion): Jede Seite kann weitere Seiten enthalten – über ＋ neben der Seite in der Seitenleiste, „/Unterseite“ im Text, „＋ Unterseite“ unten auf der Seite oder Strg+Alt+U. Seiten lassen sich per Ziehen einsortieren: auf die Mitte einer Seite = Unterseite, an den oberen/unteren Rand eines Eintrags = auf dieselbe Ebene (eine Linie zeigt es an), auf die Überschrift „Notizen“ = oberste Ebene. Alternativ per Rechtsklick bzw. ⋯ → „Verschieben nach …“ oder „Auf oberste Ebene“ (auch auf dem Handy). Gespeichert wird das als Ordner mit gleichem Namen neben der Seite (`Projekt.alenote` + `Projekt/…`); Umbenennen, Verschieben und Papierkorb nehmen die Unterseiten automatisch mit.
 Bilder landen in `_assets`. Plugins liegen in `.alenote\plugins`.
 
 ## Web-Version (Mac & jeder Browser)

@@ -1,13 +1,13 @@
 // Seitenleiste mit Ordnerstruktur, Favoriten und Plugin-Bereichen
 import { h } from '../core/utils.js';
 import { icon } from './icons.js';
-import { contextMenu, confirmDialog, toast } from './overlays.js';
+import { contextMenu, confirmDialog, toast, modal } from './overlays.js';
 import { todoBadge } from './calendar.js';
 import { shortcutText } from '../core/shortcuts.js';
 import { listTrash } from '../core/trash.js';
 import { openTemplatePicker } from './templates.js';
 import { openImport } from './export.js';
-import { pageTree, childFolder } from '../core/pages.js';
+import { pageTree, childFolder, parentOf } from '../core/pages.js';
 import { emojiNode } from '../core/emoji.js';
 
 export class Sidebar {
@@ -70,6 +70,15 @@ export class Sidebar {
       h('div.section-actions', {},
         h('button.icon-btn.tiny', { title: 'Alle einklappen', onclick: () => { this.expanded.clear(); this.saveExpanded(); this.renderTree(); } }, icon('chevronRight', 13)),
         h('button.icon-btn.tiny', { title: 'Neue Notiz', onclick: () => app.createNote('') }, icon('plus', 14))));
+    // Auf die Überschrift „Notizen“ ziehen = auf die oberste Ebene verschieben
+    treeHeader.addEventListener('dragover', (e) => { if (this.dragPath && parentOf(this.dragPath)) { e.preventDefault(); treeHeader.classList.add('drop-root-head'); } });
+    treeHeader.addEventListener('dragleave', () => treeHeader.classList.remove('drop-root-head'));
+    treeHeader.addEventListener('drop', (e) => {
+      treeHeader.classList.remove('drop-root-head');
+      if (!this.dragPath) return;
+      e.preventDefault();
+      app.moveItem(this.dragPath, '');
+    });
 
     const footer = h('div.sidebar-footer', {},
       h('button.icon-btn', { title: 'Einstellungen (Strg+,)', onclick: () => app.openSettings() }, icon('settings', 17)),
@@ -284,6 +293,8 @@ export class Sidebar {
       { label: fav ? 'Aus Favoriten entfernen' : 'Zu Favoriten', icon: 'star', run: () => app.toggleFavorite(n.path) },
       '-',
       { label: 'Umbenennen', icon: 'edit', shortcut: 'F2', run: () => this.inlineRename(n.path) },
+      { label: 'Verschieben nach …', icon: 'move', run: () => this.moveDialog(n.path) },
+      ...(n.path.includes('/') ? [{ label: 'Auf oberste Ebene', icon: 'home', run: () => app.moveItem(n.path, '') }] : []),
       { label: 'Duplizieren', icon: 'copy', run: () => app.duplicateNote(n.path) },
       { label: 'Im Explorer zeigen', icon: 'external', run: () => app.api.revealInExplorer(n.path) },
       '-',
@@ -301,6 +312,7 @@ export class Sidebar {
       { label: 'Hierher importieren …', icon: 'upload', run: () => { this.expanded.add(f.path); openImport(app, f.path); } },
       '-',
       { label: 'Umbenennen', icon: 'edit', run: () => this.inlineRename(f.path) },
+      { label: 'Verschieben nach …', icon: 'move', run: () => this.moveDialog(f.path) },
       { label: 'Im Explorer öffnen', icon: 'external', run: () => app.api.openFolder(f.path) },
       '-',
       { label: 'Ordner löschen', icon: 'trash', danger: true, run: () => app.deleteItem(f.path, f.name, true) }
@@ -343,27 +355,93 @@ export class Sidebar {
     row.addEventListener('dragend', () => { this.dragPath = null; row.classList.remove('dragging'); this.treeEl.querySelectorAll('.drop-into').forEach((x) => x.classList.remove('drop-into')); });
   }
 
+  /** Darf this.dragPath in den Ordner „folder“? (nicht in sich selbst oder die eigenen Unterseiten) */
+  canDropInto(folder) {
+    const d = this.dragPath;
+    if (!d) return false;
+    const own = d.endsWith('.alenote') ? childFolder(d) : d;
+    return folder !== own && !folder.startsWith(own + '/') && folder !== parentOf(d);
+  }
+
+  /**
+   * Ziel beim Ziehen: oberes/unteres Viertel einer Zeile = auf dieselbe Ebene wie dieser Eintrag
+   * (Linie wird angezeigt), Mitte = hinein (als Unterseite bzw. in den Ordner).
+   */
   makeDropTarget(row, folderPath, expand = () => row.click(), selfPath = folderPath) {
     let timer;
+    const clear = () => { row.classList.remove('drop-into', 'drop-before', 'drop-after'); clearTimeout(timer); timer = null; };
+    const zoneOf = (e) => {
+      const r = row.getBoundingClientRect();
+      const y = (e.clientY - r.top) / r.height;
+      return y < 0.28 ? 'before' : y > 0.72 ? 'after' : 'into';
+    };
+    const targetOf = (zone) => (zone === 'into' ? folderPath : parentOf(selfPath));
     row.addEventListener('dragover', (e) => {
-      const own = this.dragPath?.endsWith('.alenote') ? childFolder(this.dragPath) : this.dragPath;
-      if (!this.dragPath || this.dragPath === selfPath || folderPath === own || folderPath.startsWith(own + '/')) return;
+      if (!this.dragPath || this.dragPath === selfPath) return;
+      let zone = zoneOf(e);
+      if (zone === 'into' && !this.canDropInto(folderPath)) zone = null;
+      if (zone && zone !== 'into' && !this.canDropInto(targetOf(zone))) zone = this.canDropInto(folderPath) ? 'into' : null;
+      if (!zone) { clear(); return; }
       e.preventDefault();
       e.stopPropagation();
-      row.classList.add('drop-into');
-      if (!timer && !row.classList.contains('open')) timer = setTimeout(expand, 700);
+      row.classList.toggle('drop-into', zone === 'into');
+      row.classList.toggle('drop-before', zone === 'before');
+      row.classList.toggle('drop-after', zone === 'after');
+      row.title = zone === 'into' ? '' : (targetOf(zone) ? 'Auf diese Ebene verschieben' : 'Auf die oberste Ebene verschieben');
+      if (zone === 'into') { if (!timer && !row.classList.contains('open')) timer = setTimeout(expand, 700); }
+      else { clearTimeout(timer); timer = null; }
     });
-    row.addEventListener('dragleave', () => { row.classList.remove('drop-into'); clearTimeout(timer); timer = null; });
+    row.addEventListener('dragleave', clear);
     row.addEventListener('drop', (e) => {
+      const zone = row.classList.contains('drop-into') ? 'into' : row.classList.contains('drop-before') ? 'before' : row.classList.contains('drop-after') ? 'after' : null;
+      clear();
+      row.title = '';
+      if (!zone || !this.dragPath) return;
       e.preventDefault();
       e.stopPropagation();
-      clearTimeout(timer); timer = null;
-      row.classList.remove('drop-into');
-      if (this.dragPath) {
-        this.expanded.add(selfPath);
-        this.app.moveItem(this.dragPath, folderPath);
-      }
+      if (zone === 'into') this.expanded.add(selfPath);
+      this.app.moveItem(this.dragPath, targetOf(zone));
     });
+  }
+
+  /** „Verschieben nach …“: Ziel aus einer Liste wählen (geht auch auf dem Handy) */
+  moveDialog(path) {
+    const isNote = path.endsWith('.alenote');
+    const own = isNote ? childFolder(path) : path;
+    const name = path.split('/').pop().replace(/\.alenote$/, '');
+    const targets = [{ folder: '', label: 'Oberste Ebene', icon: 'home', depth: 0 }];
+    const walk = (nodes, depth) => {
+      for (const n of nodes) {
+        const folder = n.type === 'folder' ? n.path : childFolder(n.path);
+        if (folder === own || folder.startsWith(own + '/')) continue;
+        if (n.type === 'folder' || n.path !== path) targets.push({ folder, label: n.name, icon: n.type === 'folder' ? 'folder' : null, emoji: n.icon, depth: depth + 1, note: n.type === 'note' });
+        if (n.children?.length) walk(n.children, depth + 1);
+      }
+    };
+    walk(this.tree, 0);
+    const search = h('input.input', { placeholder: 'Seite oder Ordner suchen …' });
+    const list = h('div.move-list');
+    const current = parentOf(path);
+    let m;
+    const render = () => {
+      const q = search.value.trim().toLowerCase();
+      list.innerHTML = '';
+      for (const t of targets) {
+        if (q && !t.label.toLowerCase().includes(q)) continue;
+        const here = t.folder === current;
+        list.append(h('button.move-item' + (here ? '.here' : ''), {
+          style: { paddingLeft: (q ? 10 : 10 + t.depth * 16) + 'px' }, disabled: here,
+          onclick: () => { m.close(); if (t.note) this.expanded.add(t.folder + '.alenote'); this.app.moveItem(path, t.folder); }
+        }, t.emoji ? emojiNode(t.emoji, 'move-emoji') : icon(t.icon || 'file', 15), h('span', { text: t.label }),
+        here ? h('span.muted.small', { text: 'aktuell' }) : t.note ? h('span.muted.small', { text: 'als Unterseite' }) : null));
+      }
+      if (!list.children.length) list.append(h('div.muted.small.move-empty', { text: 'Nichts gefunden' }));
+    };
+    search.addEventListener('input', render);
+    search.addEventListener('keydown', (e) => { if (e.key === 'Enter') list.querySelector('.move-item:not(:disabled)')?.click(); });
+    render();
+    m = modal({ title: `„${name}“ verschieben nach …`, content: h('div.move-dialog', {}, search, list), width: 'min(440px, 94vw)' });
+    if (!matchMedia('(pointer: coarse)').matches) setTimeout(() => search.focus(), 50);
   }
 
   setActive(path) {

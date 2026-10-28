@@ -147,6 +147,19 @@ body.sidebar-hidden .sidebar, body.focus-mode .sidebar { margin-left: calc(-1 * 
 .tree-item.active::before { content: ''; position: absolute; left: 0; top: 7px; bottom: 7px; width: 3px; border-radius: 3px; background: var(--accent); animation: grow .3s var(--ease); }
 @keyframes grow { from { transform: scaleY(0); } }
 .tree-item.dragging { opacity: .4; }
+.tree-item.drop-before, .tree-item.drop-after { position: relative; }
+.tree-item.drop-before::after, .tree-item.drop-after::after { content: ''; position: absolute; left: calc(6px + var(--depth, 0) * 16px); right: 6px; height: 2px; border-radius: 2px; background: var(--accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 25%, transparent); pointer-events: none; }
+.tree-item.drop-before::after { top: -1px; }
+.tree-item.drop-after::after { bottom: -1px; }
+.section-title.drop-root-head { color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); border-radius: 6px; box-shadow: inset 0 0 0 1.5px var(--accent); }
+.move-dialog { display: flex; flex-direction: column; gap: 10px; }
+.move-list { display: flex; flex-direction: column; max-height: min(420px, 60vh); overflow-y: auto; margin: 0 -6px; }
+.move-item { display: flex; align-items: center; gap: 9px; min-height: 36px; padding: 6px 10px; border-radius: 8px; text-align: left; color: var(--text); font-size: 14px; }
+.move-item > span:nth-child(2) { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.move-item:hover:not(:disabled) { background: var(--bg-hover); }
+.move-item:disabled { opacity: .5; cursor: default; }
+.move-item .icon { color: var(--text-3); flex: none; }
+.move-empty { padding: 14px; text-align: center; }
 .tree-item.drop-into { background: color-mix(in srgb, var(--accent) 22%, transparent); box-shadow: inset 0 0 0 1.5px var(--accent); }
 .tree-chevron { display: flex; width: 16px; color: var(--text-3); transition: transform .22s var(--ease); }
 .tree-item.open > .tree-chevron { transform: rotate(90deg); }
