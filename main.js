@@ -365,6 +365,9 @@ function registerAccountIpc() {
   ipcMain.handle('sync:now', () => { sync.run(); return sync.status; });
   ipcMain.handle('sync:start', () => sync.start());
   ipcMain.handle('sync:resolve', (_e, p, choice) => sync.resolve(p, choice));
+  ipcMain.handle('sync:mark', (_e, p, rev, hash) => sync.mark(p, rev, hash));
+  // Live-Bearbeitung: die Oberfläche verbindet sich selbst mit dem Server
+  ipcMain.handle('account:live', () => (settings.account ? { server: settings.account.server, token: settings.account.token, userId: settings.account.userId } : null));
 }
 
 function registerIpc() {

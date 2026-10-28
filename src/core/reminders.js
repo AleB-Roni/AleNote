@@ -5,6 +5,7 @@
 // To-dos ohne Uhrzeit erinnern zur eingestellten Standardzeit (z.B. 9:00 Uhr) am Fälligkeitstag.
 import { h, debounce } from './utils.js';
 import { icon } from '../ui/icons.js';
+import { plainIcon } from './emoji.js';
 import { collectTodos, updateTodo, parseDay, todayKey, dueLabel, dueState } from './todos.js';
 
 // auto: alle To-dos mit Datum erinnern (sonst nur die mit Glocke 🔔)
@@ -104,7 +105,7 @@ export class ReminderService {
     const open = this.todos.filter((t) => !t.checked);
     const dated = open.filter((t) => t.due);
     const todos = [...dated, ...open.filter((t) => !t.due)].slice(0, 60).map((t) => ({
-      path: t.path, id: t.id, text: t.text || 'Aufgabe', note: `${t.icon || '📄'} ${t.note}`,
+      path: t.path, id: t.id, text: t.text || 'Aufgabe', note: `${plainIcon(t.icon, '📄') || '📄'} ${t.note}`,
       label: dueLabel(t.due, t.time), state: dueState(t.due, false), bell: reminderOffsets(t, this.settings).length > 0,
       nids: this.notificationIds(t)
     }));
@@ -178,7 +179,7 @@ export class ReminderService {
     const el = h('div.rem-card', {},
       h('div.rem-head', {}, h('span.rem-bell', { text: '⏰' }), h('b', { text: 'Erinnerung' }), h('div.flex'), h('button.icon-btn.tiny', { title: 'Schließen', onclick: close }, icon('x', 13))),
       h('div.rem-text', { text: t.text || 'Aufgabe' }),
-      h('div.rem-meta.muted.small', { text: `${t.icon || '📄'} ${t.note} · ${dueLabel(t.due, t.time)}` }),
+      h('div.rem-meta.muted.small', { text: `${plainIcon(t.icon, '📄') || '📄'} ${t.note} · ${dueLabel(t.due, t.time)}` }),
       h('div.rem-actions', {},
         h('button.btn.small.btn-primary', { onclick: () => { close(); this.openTodo(t); } }, 'Öffnen'),
         h('button.btn.small', { onclick: async () => { close(); await updateTodo(this.app, t.path, t.id, { checked: true }); this.app.events.emit('todos:change'); this.app.toast('Erledigt ✓', { type: 'success', duration: 1500 }); } }, icon('check', 13), 'Erledigt'),

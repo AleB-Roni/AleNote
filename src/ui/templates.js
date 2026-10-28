@@ -1,4 +1,5 @@
 // Vorlagen-Auswahl: neue Notiz aus Vorlage oder Vorlage in die aktuelle Notiz einfügen
+import { emojiNode } from '../core/emoji.js';
 import { h, stripHtml } from '../core/utils.js';
 import { icon } from './icons.js';
 import { modal, toast, prompt } from './overlays.js';
@@ -47,7 +48,7 @@ export async function openTemplatePicker(app, { mode = 'new', folder, afterId } 
       const desc = h('div.tpl-desc.muted.small');
       preview(t).then((txt) => { desc.textContent = txt || 'Leere Vorlage'; });
       const card = h('button.tpl-card' + (i === active ? '.active' : ''), { onclick: () => choose(t) },
-        h('span.tpl-icon', { text: t.icon || '📄' }),
+        h('span.tpl-icon', {}, emojiNode(t.icon || '📄')),
         h('div.tpl-body', {}, h('div.tpl-name', { text: t.name.replace(/\{([^}]+)\}/g, '‹$1›') }), desc));
       card.addEventListener('mousemove', () => { if (active !== i) { active = i; grid.querySelectorAll('.tpl-card').forEach((c, k) => c.classList.toggle('active', k === i)); } });
       grid.append(card);

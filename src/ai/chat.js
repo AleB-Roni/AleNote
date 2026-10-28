@@ -5,6 +5,7 @@ import { toast, contextMenu, confirmDialog } from '../ui/overlays.js';
 import { PROVIDERS, streamChat } from './providers.js';
 import { blocksToMarkdown, mdToBlocks, mdInlineToHtml, cleanResult } from './markdown.js';
 import { findRelevantNotes, buildNotesContext } from './ask.js';
+import { actionsPrompt, parseActions, stripActions, runActions } from './actions.js';
 
 /** Einfaches Markdown → HTML für die Anzeige (Chat & Vorschau) */
 export function renderMarkdown(md) {
@@ -45,9 +46,15 @@ export function renderMarkdown(md) {
   return out.join('');
 }
 
-const SUGGESTIONS = ['Fasse diese Notiz zusammen', 'Finde Fehler und Unklarheiten', 'Erstelle eine Aufgabenliste daraus', 'Schlage 5 Ideen zum Thema vor', 'Erkläre mir das einfacher'];
+const SUGGESTIONS = ['Fasse diese Notiz zusammen', 'Erstelle eine Aufgabenliste daraus', 'Mach mir eine Tabelle mit den wichtigsten Punkten', 'Leg eine Unterseite für …', 'Erinnere mich morgen um 9 an …', 'Erkläre mir das einfacher'];
 const ASK_SUGGESTIONS = ['Welche offenen Aufgaben habe ich?', 'Was habe ich zuletzt notiert?', 'Fasse meine Projekte zusammen', 'Was weiß ich über …'];
 const MODES = { note: { label: 'Notiz als Kontext', icon: 'file' }, all: { label: 'Alle Notizen', icon: 'layers' }, none: { label: 'Ohne Kontext', icon: 'x' } };
+
+const describe = (a) => ({
+  insert: 'Blöcke einfügen', table: 'Tabelle einfügen', todos: `${a.items?.length || ''} Aufgaben anlegen`, page: `Seite „${a.title || ''}“ anlegen`,
+  replace: 'Notiz ersetzen', rename: `Umbenennen in „${a.title || ''}“`, icon: `Icon ${a.emoji || ''} setzen`, open: `„${a.path || a.title || ''}“ öffnen`,
+  quicknote: 'Schnellnotiz speichern', command: `Befehl ${a.id || ''} ausführen`
+})[a.type] || a.type;
 
 export class ChatPanel {
   constructor(app, ai) {
@@ -103,9 +110,14 @@ export class ChatPanel {
       { header: 'Kontext für die KI' },
       { label: 'Aktuelle Notiz', icon: 'file', active: this.mode === 'note', run: () => this.setMode('note') },
       { label: 'Alle Notizen (Frag deine Notizen)', icon: 'layers', active: this.mode === 'all', run: () => this.setMode('all') },
-      { label: 'Ohne Kontext', icon: 'x', active: this.mode === 'none', run: () => this.setMode('none') }
+      { label: 'Ohne Kontext', icon: 'x', active: this.mode === 'none', run: () => this.setMode('none') },
+      '-',
+      { label: 'KI darf Befehle ausführen', icon: 'zap', active: this.actionsOn, run: () => { this.setOpt({ actions: !this.actionsOn }); toast(this.actionsOn ? 'Die KI kann jetzt To-dos, Tabellen, Seiten usw. selbst anlegen' : 'Die KI schlägt Aktionen nur noch vor', { duration: 2500 }); } }
     ], anchor);
   }
+
+  /** Darf die KI Aktionen (To-dos, Tabellen, Seiten, Befehle …) direkt ausführen? */
+  get actionsOn() { return this.opts.actions !== false; }
 
   /** Chat im Modus „Alle Notizen“ öffnen */
   askNotes() { this.setOpt({ context: 'all' }); this.open(); }
@@ -187,7 +199,14 @@ export class ChatPanel {
       this.withContext ? h('button', { title: 'Die ganze Notiz durch diese Antwort ersetzen', onclick: () => this.replaceNote(m.content) }, icon('refresh', 13), 'Notiz ersetzen') : null);
     const sources = m.sources?.length && !m.streaming ? h('div.ai-sources', {}, h('span.muted', { text: 'Durchsucht:' }),
       ...m.sources.map((s) => h('button.ai-source', { title: s.path, onclick: () => this.app.openNote(s.path) }, icon('file', 12), s.name))) : null;
-    return h('div.ai-msg.assistant', { dataset: { index: i } }, body, m.note ? h('div.ai-note', { text: m.note }) : null, sources, actions);
+    // Von der KI ausgeführte (oder vorgeschlagene) Aktionen
+    const acts = m.actions?.length && !m.streaming ? h('div.ai-actions', {},
+      ...(m.results || m.actions.map((a) => ({ pending: true, text: describe(a) }))).map((r) => h('div.ai-action' + (r.pending ? '.pending' : r.ok ? '.ok' : '.fail'), {},
+        h('span.ai-action-icon', { text: r.pending ? '•' : r.ok ? '✓' : '✗' }), h('span', { text: r.text }),
+        r.path ? h('button.link-btn', { text: 'öffnen', onclick: () => this.app.openNote(r.path) }) : null)),
+      m.results ? null : h('button.btn.small.btn-primary', { onclick: async () => { m.results = await runActions(this.app, m.actions); this.renderMessages(); } }, icon('zap', 13), 'Ausführen')) : null;
+    if (acts && !m.content && !m.error) body.remove();
+    return h('div.ai-msg.assistant', { dataset: { index: i } }, body, acts, m.note ? h('div.ai-note', { text: m.note }) : null, sources, actions);
   }
 
   /** [[Notiztitel]] in Antworten → klickbare Links zur Notiz */
@@ -215,6 +234,7 @@ export class ChatPanel {
     if (!this.isOpen) this.open(false);
     const editor = this.app.editor;
     let system = 'Du bist ein hilfreicher Assistent in der Notiz-App AleNote. Antworte in der Sprache des Nutzers, klar und gut strukturiert. Nutze Markdown (Überschriften, Listen, - [ ] Aufgaben, Tabellen).';
+    system += '\n' + actionsPrompt(this.app);
     let sources = null;
     if (mode === 'all') {
       // Passende Notizen suchen (vorherige Fragen helfen bei Rückfragen wie „und wann?“)
@@ -237,12 +257,18 @@ export class ChatPanel {
     try {
       const res = await streamChat(this.ai.providerConfig(providerId, this.opts.provider === providerId ? this.opts.model : undefined), {
         system,
-        messages: hist.filter((m) => m !== reply && !m.error).map((m) => ({ role: m.role, content: m.content })),
+        messages: hist.filter((m) => m !== reply && !m.error).map((m) => ({ role: m.role, content: m.raw || m.content })),
         signal: this.abort.signal,
-        onText: (_, all) => { reply.content = all; bubble.innerHTML = this.linkNotes(renderMarkdown(all)); this.list.scrollTop = this.list.scrollHeight; }
+        onText: (_, all) => { reply.content = stripActions(all); bubble.innerHTML = this.linkNotes(renderMarkdown(reply.content)) || '<span class="ai-spinner"></span>'; this.list.scrollTop = this.list.scrollHeight; }
       });
-      reply.content = res.text;
+      reply.raw = res.text;
+      reply.content = stripActions(res.text);
       reply.note = res.note;
+      reply.actions = parseActions(res.text);
+      if (reply.actions.length && this.actionsOn) {
+        reply.streaming = false;
+        reply.results = await runActions(this.app, reply.actions);
+      }
     } catch (e) {
       if (e.name !== 'AbortError') reply.error = e.message;
       else if (!reply.content) reply.error = 'Abgebrochen';

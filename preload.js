@@ -45,6 +45,8 @@ contextBridge.exposeInMainWorld('alenoteNative', {
   noteVersion: call('history:get'),
   syncStart: call('sync:start'),
   syncResolve: call('sync:resolve'),
+  syncMark: call('sync:mark'),
+  liveCredentials: call('account:live'),
   // Updates
   appVersion: call('app:version'),
   updateStatus: call('update:get'),

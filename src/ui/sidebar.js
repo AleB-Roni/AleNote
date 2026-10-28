@@ -8,6 +8,7 @@ import { listTrash } from '../core/trash.js';
 import { openTemplatePicker } from './templates.js';
 import { openImport } from './export.js';
 import { pageTree, childFolder } from '../core/pages.js';
+import { emojiNode } from '../core/emoji.js';
 
 export class Sidebar {
   constructor(app, el) {
@@ -220,17 +221,21 @@ export class Sidebar {
     const inner = h('div.tree-children-inner');
     children.append(inner);
     if (open) this.renderNodes(f.children, inner, depth + 1);
-    row.addEventListener('click', () => {
-      const isOpen = !row.classList.contains('open');
+    const toggle = (force) => {
+      const isOpen = force ?? !row.classList.contains('open');
       row.classList.toggle('open', isOpen);
       if (isOpen) { this.expanded.add(f.path); if (!inner.children.length) this.renderNodes(f.children, inner, depth + 1); }
       else this.expanded.delete(f.path);
       children.classList.toggle('open', isOpen);
       this.saveExpanded();
-    });
+    };
+    // Pfeil: auf-/zuklappen · Name: Ordner wie eine Seite öffnen (dort lässt sich Text schreiben)
+    row.querySelector('.tree-chevron').addEventListener('click', (e) => { e.stopPropagation(); toggle(); });
+    row.addEventListener('click', () => { toggle(true); this.app.openFolderPage(f.path); });
+    row._toggle = toggle;
     row.addEventListener('contextmenu', (e) => { e.preventDefault(); this.folderMenu(f, { x: e.clientX, y: e.clientY }); });
     this.makeDraggable(row, f.path);
-    this.makeDropTarget(row, f.path);
+    this.makeDropTarget(row, f.path, () => toggle(true));
     return h('div.tree-node', {}, row, children);
   }
 
@@ -241,7 +246,7 @@ export class Sidebar {
     const chevron = h('span.tree-chevron' + (kids ? '' : '.empty'), {}, kids ? icon('chevronRight', 13) : null);
     const row = h('div.tree-item.note' + (active ? '.active' : '') + (open ? '.open' : '') + (kids ? '.has-kids' : ''), { draggable: !isFav, dataset: { path: n.path }, style: { '--depth': depth } },
       chevron,
-      n.icon ? h('span.tree-emoji', { text: n.icon }) : icon(kids ? 'files' : 'file', 15, 'tree-icon'),
+      n.icon ? h('span.tree-emoji', {}, emojiNode(n.icon)) : icon(kids ? 'files' : 'file', 15, 'tree-icon'),
       h('span.tree-label', { text: n.name }),
       h('div.tree-actions', {},
         isFav ? null : h('button.icon-btn.tiny', { title: 'Unterseite hinzufügen', onclick: (e) => { e.stopPropagation(); this.app.createSubpage(n.path); } }, icon('plus', 13)),
@@ -289,6 +294,7 @@ export class Sidebar {
   folderMenu(f, pos) {
     const app = this.app;
     contextMenu([
+      { label: 'Als Seite öffnen', icon: 'file', run: () => app.openFolderPage(f.path) },
       { label: 'Neue Notiz', icon: 'filePlus', run: () => { this.expanded.add(f.path); app.createNote(f.path); } },
       { label: 'Neue Notiz aus Vorlage', icon: 'layers', run: () => { this.expanded.add(f.path); openTemplatePicker(app, { mode: 'new', folder: f.path }); } },
       { label: 'Neuer Unterordner', icon: 'folderPlus', run: () => { this.expanded.add(f.path); app.createFolder(f.path); } },

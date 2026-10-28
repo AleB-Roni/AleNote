@@ -7,6 +7,7 @@ import { modal, prompt, toast } from './overlays.js';
 import { datePicker } from './datepicker.js';
 import { addQuickNote, quickSettings, dueLabel } from '../core/todos.js';
 import { startDictation } from '../ai/dictate.js';
+import { plainIcon } from '../core/emoji.js';
 
 /**
  * Baut das Formular.
@@ -31,7 +32,7 @@ export function quickNoteForm({ notes, qs, preset = {}, onSubmit, onCancel, dict
     target.innerHTML = '';
     const list = [...notes];
     if (!list.some((n) => n.path === state.target)) list.unshift({ path: state.target, name: state.target.replace(/\.alenote$/, '').split('/').pop() + ' (neu)' });
-    for (const n of list) target.append(h('option', { value: n.path, text: (n.icon ? n.icon + ' ' : '📄 ') + n.path.replace(/\.alenote$/, ''), selected: n.path === state.target }));
+    for (const n of list) target.append(h('option', { value: n.path, text: (n.icon ? plainIcon(n.icon) + ' ' : '📄 ') + n.path.replace(/\.alenote$/, ''), selected: n.path === state.target }));
     target.append(h('option', { value: '__new', text: '＋ Neue Notiz …' }));
   };
   fill();

@@ -2,6 +2,7 @@
 // Notion durchklicken. Dazu „＋ Unterseite“ zum Anlegen.
 import { h } from '../core/utils.js';
 import { icon } from './icons.js';
+import { emojiNode } from '../core/emoji.js';
 
 export function initSubpages(app) {
   const render = () => {
@@ -22,7 +23,7 @@ export function initSubpages(app) {
       }
       const n = k.children?.length || 0;
       grid.append(h('button.subpage-card', { onclick: () => app.openNote(k.path), title: k.name },
-        k.icon ? h('span.subpage-emoji', { text: k.icon }) : icon(n ? 'files' : 'file', 16),
+        k.icon ? h('span.subpage-emoji', {}, emojiNode(k.icon)) : icon(n ? 'files' : 'file', 16),
         h('span.subpage-name', { text: k.name }),
         n ? h('span.subpage-meta', { text: String(n) }) : null));
     }

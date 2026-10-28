@@ -8,6 +8,7 @@ import { datePicker } from '../ui/datepicker.js';
 import { dueLabel, dueState } from '../core/todos.js';
 import { offsetLabel, remindSettings } from '../core/reminders.js';
 import { remindPicker } from '../ui/remindpicker.js';
+import { emojiNode } from '../core/emoji.js';
 
 /** Erstellt das Haupt-Textfeld eines Blocks */
 export function editable(block, { tag = 'div', field = 'text', placeholder = '', cls = '' } = {}) {
@@ -143,7 +144,7 @@ export default function registerTextBlocks(registry) {
     create: () => ({ text: '', icon: '💡', tone: 'blue' }),
     markdown: /^!>\s/,
     render(b, ctx) {
-      const ic = h('button.callout-icon', { text: b.data.icon || '💡', title: 'Icon ändern' });
+      const ic = h('button.callout-icon', { title: 'Icon ändern' }, emojiNode(b.data.icon || '💡'));
       ic.addEventListener('click', () => emojiPicker(ic, (em) => ctx.update({ icon: em || '💡' }, { rerender: true })));
       const box = h('div.callout', { dataset: { tone: b.data.tone || 'blue' } }, ic, editable(b, { placeholder: 'Hinweis eingeben…' }));
       box.addEventListener('contextmenu', (e) => {

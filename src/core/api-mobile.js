@@ -448,6 +448,8 @@ export async function createMobileApi({ web = false } = {}) {
     },
     syncStart: async () => sync.start(),
     syncResolve: (p, choice) => sync.resolve(p, choice),
+    syncMark: (p, rev, hash) => sync.mark(p, rev, hash),
+    liveCredentials: async () => (settings.account ? { server: settings.account.server, token: settings.account.token, userId: settings.account.userId } : null),
 
     // Updates
     appVersion: async () => appInfo.version,

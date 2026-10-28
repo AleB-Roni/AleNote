@@ -42,6 +42,16 @@ Jeder Eintrag hat `kind` (`note`, `folder`, `asset`), `rev` (Version), `hash` (S
 
 Die Referenz-Implementierung ist [`sync.js`](../sync.js).
 
+## Live-Bearbeitung
+
+| Methode | Pfad | Beschreibung |
+|---|---|---|
+| GET | `/api/live?client=<id>&device=<name>` | Server-Sent Events (mit `Authorization`-Header, z.B. per `fetch`-Stream). Ereignisse: `hello` `{ client, presence }`, `presence` `{ list }`, `change` `{ path, kind, rev, deleted }` (→ sofort abgleichen), `edit` `{ path, patch, rev, hash, content, by }` |
+| POST | `/api/live/presence` | `{ client, path }` → welche Notiz dieses Gerät gerade offen hat |
+| POST | `/api/live/edit` | `{ client, path, patch }` → Block-Änderungen einarbeiten. `patch = { blocks: { id: block \| null }, order?: [ids], meta?: { key: value \| null } }`. Antwort `{ rev, hash, content }` – diese Fassung lokal speichern und als synchron vormerken. **404**, wenn die Notiz noch nicht auf dem Server liegt (erst normal hochladen) |
+
+Der Server führt Änderungen pro Block zusammen (die letzte gewinnt) und schickt sie als `edit` an die anderen Geräte. Optionaler Header `X-AleNote-Client` bei Sync-Anfragen verhindert, dass das eigene Gerät seine `change`-Meldung bekommt. Die Referenz-Implementierung ist [`src/core/live.js`](../src/core/live.js).
+
 ## Notiz-Format (`content`)
 
 ```json

@@ -223,6 +223,8 @@ export class AccountUI {
       this.app.showEmpty();
       return;
     }
+    // Live: geöffnete Notiz sanft aktualisieren (Cursor bleibt, kein Neuzeichnen)
+    if (paths.includes(cur) && this.app.live?.handles(cur) && (await this.app.live.reloadFromDisk(cur))) return;
     if (paths.includes(cur) && !this.app.dirty) {
       const scroll = this.app.editorScroll.scrollTop;
       const note = await this.api.readNote(cur).catch(() => null);
@@ -234,6 +236,13 @@ export class AccountUI {
   }
 
   onConflicts(list) {
+    // Kurz warten: die Live-Verbindung führt Offline-Änderungen oft gleich selbst zusammen
+    this.latestConflicts = list;
+    clearTimeout(this.conflictTimer);
+    this.conflictTimer = setTimeout(() => this.showConflicts(this.latestConflicts || []), list.length ? 2500 : 0);
+  }
+
+  showConflicts(list) {
     const fresh = list.filter((c) => !this.shownConflicts.has(c.path));
     if (!fresh.length || document.querySelector('.conflict-modal')) return;
     const c = fresh[0];
@@ -299,6 +308,13 @@ export class AccountUI {
     page.append(
       h('div.set-row', {}, h('div.set-label', {}, h('div', { text: 'Status' }), h('div.muted.small', { text: this.status.message || `Letzter Abgleich: ${ago(this.status.lastSync)}` })),
         h('div.set-control', {}, h('span.sync-chip.static.' + (st.cls || 'none'), {}, icon(st.icon, 14), h('span', { text: st.label })))),
+      h('div.set-row', {}, h('div.set-label', {}, h('div', { text: 'Live-Bearbeitung' }), h('div.muted.small', { text: 'Änderungen erscheinen sofort auf deinen anderen Geräten, solange du online bist. Offline wird wie gewohnt lokal gespeichert und später abgeglichen.' })),
+        h('div.set-control', {}, (() => {
+          const on = this.app.settings.live !== false;
+          const el = h('button.switch' + (on ? '.on' : ''), { role: 'switch' });
+          el.addEventListener('click', async () => { const v = !el.classList.contains('on'); el.classList.toggle('on', v); await this.app.saveSettings({ live: v }); this.app.live?.start(); });
+          return el;
+        })())),
       h('div.set-row', {}, h('div.set-label', {}, h('div', { text: 'Server' }), h('div.muted.small', { text: (/^https:/i.test(a.server) ? '🔒 ' : '') + a.server })),
         h('div.set-control', {}, h('div.row-inline', {},
           this.api.changeServer ? h('button.btn.small', { title: 'Z.B. auf die neue HTTPS-Adresse umstellen – Anmeldung und Notizen bleiben', onclick: () => this.changeServer().then(rerender) }, icon('edit', 14), 'Adresse ändern') : null,

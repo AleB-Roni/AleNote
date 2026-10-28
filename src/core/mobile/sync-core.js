@@ -7,7 +7,7 @@ const NOTE_EXT = '.alenote';
 
 /** SHA-1 als Hex – wie auf dem Server. Browser stellen crypto.subtle nur über HTTPS bereit,
  *  daher gibt es für die Web-Version über http:// eine eigene Umsetzung. */
-async function sha1Hex(text) {
+export async function sha1Hex(text) {
   const bytes = new TextEncoder().encode(text);
   if (globalThis.crypto?.subtle?.digest) {
     try {
@@ -60,6 +60,7 @@ export class MobileSync {
     this.interval = null;
     this.status = { state: 'off' };
     this.conflicts = new Map();
+    this.marks = new Map(); // Live-Bearbeitung: vom Server bestätigte Stände (Pfad → { rev, hash })
   }
 
   start() {
@@ -160,6 +161,32 @@ export class MobileSync {
     }
   }
 
+  /**
+   * Live-Bearbeitung: Die lokale Datei entspricht jetzt genau dieser Server-Version
+   * (rev/hash) – sie muss also weder hoch- noch heruntergeladen werden.
+   */
+  async mark(p, rev, hash) {
+    this.marks.set(p, { kind: 'note', rev, hash });
+    if (this.running) return; // wird am Ende des laufenden Abgleichs übernommen
+    const had = this.conflicts.size;
+    const state = await this.loadState();
+    this.applyMarks(state);
+    await this.saveState(state);
+    if (had !== this.conflicts.size) {
+      this.setStatus({ state: this.conflicts.size ? 'conflict' : 'ok', conflicts: this.conflicts.size });
+      this.notify('sync:conflicts', [...this.conflicts.values()]);
+    }
+  }
+
+  applyMarks(state) {
+    for (const [p, m] of this.marks) {
+      const cur = state.items[p];
+      if (!cur || !(cur.rev > m.rev)) state.items[p] = m;
+      this.conflicts.delete(p); // über die Live-Verbindung zusammengeführt → kein Konflikt mehr
+    }
+    this.marks.clear();
+  }
+
   async syncOnce(changed) {
     const state = await this.loadState();
     const remote = await this.request('GET', `/api/sync/changes?since=${state.lastSeq}`);
@@ -203,6 +230,7 @@ export class MobileSync {
       delete B[key];
     }
     state.lastSeq = remote.seq;
+    this.applyMarks(state);
     await this.saveState(state);
   }
 

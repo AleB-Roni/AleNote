@@ -10,6 +10,11 @@ const { JsonFile } = require('./lib/store');
 const { Vault } = require('./lib/vault');
 const A = require('./lib/auth');
 const { UpdateStore } = require('./lib/updates');
+const { LiveHub } = require('./lib/live');
+
+const live = new LiveHub();
+/** Anderen Geräten melden, dass sich etwas geändert hat (sie gleichen dann sofort ab) */
+const announce = (req, ctx, res) => { if (res && !res.unchanged) live.send(ctx.user.id, 'change', { path: res.path, kind: res.kind, rev: res.rev, deleted: !!res.deleted }, req.headers['x-alenote-client'] || null); return res; };
 
 // Im Docker-Container als PUID/PGID statt als root laufen (z.B. Unraid: 99/100)
 if (process.getuid?.() === 0 && process.env.PUID && process.env.PUID !== '0') {
@@ -215,12 +220,28 @@ route('GET', '/api/sync/note', async (req, ctx, q) => {
 route('PUT', '/api/sync/note', async (req, ctx) => {
   const { path: p, content, baseRev, force } = await readJson(req);
   if (typeof content !== 'string') throw A.httpError(400, 'content fehlt');
-  return vaultOf(ctx.user.id).write('note', p, Buffer.from(content, 'utf8'), { baseRev: Number(baseRev || 0), force: !!force, quotaBytes: quota(ctx.user) });
+  return announce(req, ctx, await vaultOf(ctx.user.id).write('note', p, Buffer.from(content, 'utf8'), { baseRev: Number(baseRev || 0), force: !!force, quotaBytes: quota(ctx.user) }));
 });
 
 route('DELETE', '/api/sync/note', async (req, ctx, q) => {
   const base = q.get('baseRev');
-  return vaultOf(ctx.user.id).remove(q.get('path'), { baseRev: base == null ? null : Number(base), force: q.get('force') === '1' });
+  return announce(req, ctx, await vaultOf(ctx.user.id).remove(q.get('path'), { baseRev: base == null ? null : Number(base), force: q.get('force') === '1' }));
+});
+
+// ---- Live-Bearbeitung ----
+// Verbindung: GET /api/live (Server-Sent Events, siehe lib/live.js und HTTP-Server unten)
+route('POST', '/api/live/presence', async (req, ctx) => {
+  const { client, path: p } = await readJson(req);
+  live.setPath(ctx.user.id, String(client || ''), typeof p === 'string' ? p : null);
+  return { ok: true };
+});
+
+route('POST', '/api/live/edit', async (req, ctx) => {
+  const { client, path: p, patch } = await readJson(req);
+  if (!patch || typeof patch !== 'object') throw A.httpError(400, 'patch fehlt');
+  const res = await vaultOf(ctx.user.id).patchNote(p, patch, { quotaBytes: quota(ctx.user) });
+  if (!res.unchanged) live.send(ctx.user.id, 'edit', { path: p, patch, rev: res.rev, hash: res.hash, content: res.content, by: client || null }, client || null);
+  return { path: p, rev: res.rev, hash: res.hash, content: res.content };
 });
 
 // Kalender-Abo (iCal) für Web- und Handy-App laden (Browser dürfen fremde Kalender wegen CORS nicht direkt laden).
@@ -241,8 +262,8 @@ route('GET', '/api/ical', async (req, ctx, q) => {
 route('GET', '/api/sync/versions', async (req, ctx, q) => vaultOf(ctx.user.id).versions(q.get('path')));
 route('GET', '/api/sync/version', async (req, ctx, q) => ({ content: await vaultOf(ctx.user.id).version(q.get('path'), q.get('id')) }));
 
-route('PUT', '/api/sync/folder', async (req, ctx) => vaultOf(ctx.user.id).putFolder((await readJson(req)).path));
-route('DELETE', '/api/sync/folder', async (req, ctx, q) => vaultOf(ctx.user.id).remove(q.get('path'), { force: true }));
+route('PUT', '/api/sync/folder', async (req, ctx) => announce(req, ctx, await vaultOf(ctx.user.id).putFolder((await readJson(req)).path)));
+route('DELETE', '/api/sync/folder', async (req, ctx, q) => announce(req, ctx, await vaultOf(ctx.user.id).remove(q.get('path'), { force: true })));
 
 // Bilder als Base64 (für die Handy-App, deren WebView keine Binärdaten zuverlässig sendet)
 route('GET', '/api/sync/asset64/:name', async (req, ctx, q, params) => {
@@ -254,7 +275,7 @@ route('PUT', '/api/sync/asset64/:name', async (req, ctx, q, params) => {
   if (typeof data !== 'string') throw A.httpError(400, 'data fehlt');
   const buf = Buffer.from(data, 'base64');
   if (buf.length > settings().maxUploadMB * 1048576) throw A.httpError(413, 'Datei zu groß');
-  return vaultOf(ctx.user.id).write('asset', decodeURIComponent(params.name), buf, { force: true, quotaBytes: quota(ctx.user) });
+  return announce(req, ctx, await vaultOf(ctx.user.id).write('asset', decodeURIComponent(params.name), buf, { force: true, quotaBytes: quota(ctx.user) }));
 });
 
 route('GET', '/api/sync/asset/:name', async (req, ctx, q, params) => {
@@ -263,7 +284,7 @@ route('GET', '/api/sync/asset/:name', async (req, ctx, q, params) => {
 });
 route('PUT', '/api/sync/asset/:name', async (req, ctx, q, params) => {
   const buf = await readBody(req, settings().maxUploadMB * 1048576);
-  return vaultOf(ctx.user.id).write('asset', decodeURIComponent(params.name), buf, { force: true, quotaBytes: quota(ctx.user) });
+  return announce(req, ctx, await vaultOf(ctx.user.id).write('asset', decodeURIComponent(params.name), buf, { force: true, quotaBytes: quota(ctx.user) }));
 });
 
 // ---- Admin ----
@@ -276,7 +297,7 @@ route('GET', '/api/admin/stats', async (req, ctx) => {
   return {
     users: users().length, admins: users().filter((u) => u.role === 'admin').length, disabled: users().filter((u) => u.disabled).length,
     sessions: sessions.length, activeToday: new Set(sessions.filter((s) => now - s.lastSeen < 864e5).map((s) => s.userId)).size,
-    bytes, notes, assets, version: VERSION, uptime: process.uptime(), node: process.version, dataDir: DATA
+    bytes, notes, assets, live: live.count(), version: VERSION, uptime: process.uptime(), node: process.version, dataDir: DATA
   };
 });
 
@@ -494,7 +515,7 @@ const PUBLIC = new Set(['/api/health', '/api/login', '/api/register']);
 const server = http.createServer(async (req, res) => {
   // CORS – erlaubt Zugriff aus Desktop-App, Handy-App und Browser
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type');
+  res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type, X-AleNote-Client');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
   if (req.method === 'OPTIONS') { res.writeHead(204); return res.end(); }
 
@@ -506,6 +527,10 @@ const server = http.createServer(async (req, res) => {
     if (pathname.startsWith('/app/') && (req.method === 'GET' || req.method === 'HEAD')) return await serveWeb(req, res, pathname);
     if (pathname === '/admin' || pathname.startsWith('/admin/')) return await serveAdmin(res, pathname);
     if (pathname.startsWith('/updates/') && (req.method === 'GET' || req.method === 'HEAD')) return await updates.serve(req, res, decodeURIComponent(pathname.slice(9)));
+    if (pathname === '/api/live' && req.method === 'GET') {
+      const ctx = await authenticate(req);
+      return live.attach(req, res, ctx.user, { client: url.searchParams.get('client'), device: url.searchParams.get('device') });
+    }
     if (pathname === '/api/health') {
       const h = { ok: true, name: settings().serverName, version: VERSION, allowRegistration: settings().allowRegistration, motd: settings().motd, appVersion: updates.info().version };
       return send(res, 200, h);

@@ -26,6 +26,9 @@ import { addQuickNote, dueLabel } from './core/todos.js';
 import { moveToTrash, listTrash, restoreFromTrash, purgeExpired } from './core/trash.js';
 import { openTrash } from './ui/trash.js';
 import { initSubpages } from './ui/subpages.js';
+import { LiveService } from './core/live.js';
+import { initEmojis, emojiNode, customEmojiHtml, CUSTOM_RE } from './core/emoji.js';
+import { emojiPicker } from './ui/pickers.js';
 import { childFolder, parentOf, isNotePath, remap as remapPath, remapPageLinks } from './core/pages.js';
 import { openTemplatePicker, saveCurrentAsTemplate } from './ui/templates.js';
 import { openHistory } from './ui/history.js';
@@ -76,12 +79,14 @@ class App {
     await safe('KI', () => { this.ai = new AIManager(this); this.ai.registerAll(); });
 
     await safe('Konto', async () => { this.account = new AccountUI(this); await this.account.init(); });
+    safe('Live', () => { this.live = new LiveService(this); this.live.init(); });
     await safe('Updates', () => { this.updates = new UpdateUI(this); this.updates.init(); });
 
     let tree = [];
     await safe('Notizen laden', async () => { tree = await this.sidebar.refresh(); });
     this.reminders = new ReminderService(this);
     initSubpages(this);
+    initEmojis(this);
     if (!tree.length && !this.settings.welcomed) {
       const p = await api.createNote('', 'Willkommen bei AleNote', welcomeNote());
       await this.saveSettings({ welcomed: true });
@@ -297,8 +302,8 @@ class App {
       if (i) this.breadcrumbEl.append(h('span.crumb-sep', { text: '/' }));
       // Gehört der Ordner zu einer Seite, führt die Krume zu dieser Elternseite
       const page = !last && notes.find((n) => n.path === parts.slice(0, i + 1).join('/') + '.alenote');
-      if (page) this.breadcrumbEl.append(h('button.crumb.crumb-page', { title: 'Zu „' + page.name + '“', onclick: () => this.openNote(page.path) }, page.icon ? page.icon + ' ' : '', page.name));
-      else this.breadcrumbEl.append(h('span.crumb' + (last ? '.current' : ''), {}, last && this.editor.note?.icon ? this.editor.note.icon + ' ' : '', label));
+      if (page) this.breadcrumbEl.append(h('button.crumb.crumb-page', { title: 'Zu „' + page.name + '“', onclick: () => this.openNote(page.path) }, page.icon ? emojiNode(page.icon, 'crumb-emoji') : '', page.name));
+      else this.breadcrumbEl.append(h('span.crumb' + (last ? '.current' : ''), {}, last && this.editor.note?.icon ? emojiNode(this.editor.note.icon, 'crumb-emoji') : '', label));
     });
     const fav = (this.settings.favorites || []).includes(path);
     this.mainEl.querySelector('.fav-btn').classList.toggle('active', fav);
@@ -310,8 +315,13 @@ class App {
     this.statusEl.className = 'save-status ' + cls;
   }
 
-  saveNow() {
+  saveNow({ local = false } = {}) {
     if (!this.editor?.note || !this.currentPath) return this.saveQueue;
+    // Online: über die Live-Verbindung speichern (lokal wird die bestätigte Fassung abgelegt)
+    if (!local && this.live?.handles(this.currentPath)) {
+      this.scheduleSave?.cancel?.();
+      return this.live.flush().catch(() => this.saveNow({ local: true }));
+    }
     this.scheduleSave?.cancel?.();
     const path = this.currentPath;
     const data = JSON.parse(JSON.stringify({ version: 1, created: this.editor.note.created || Date.now(), ...this.editor.note }));
@@ -414,6 +424,26 @@ class App {
       this.updateChrome();
       this.sidebar.setActive(this.currentPath);
     } catch (err) { toast(err.message, { type: 'error' }); }
+  }
+
+  /**
+   * Ordner wie eine Seite öffnen (wie in Notion): Neben dem Ordner wird dafür eine gleichnamige
+   * Seite angelegt – der Ordnerinhalt sind dann ihre Unterseiten (siehe core/pages.js).
+   */
+  async openFolderPage(folder) {
+    const path = folder + '.alenote';
+    if (!this.sidebar.allNotes().some((n) => n.path === path)) {
+      await this.saveNow();
+      const name = folder.split('/').pop();
+      const p = await api.createNote(parentOf(folder), name, { version: 1, created: Date.now(), updated: Date.now(), icon: '📁', blocks: [], floats: [] });
+      this.sidebar.expanded.add(p);
+      this.sidebar.saveExpanded();
+      await this.sidebar.refresh();
+      await this.openNote(p);
+      return p;
+    }
+    await this.openNote(path);
+    return path;
   }
 
   /** Neue Unterseite in einer Seite anlegen (und öffnen) */
@@ -625,6 +655,25 @@ class App {
   }
 
   registerCoreSlashCommands() {
+    this.registry.registerSlashCommand({
+      id: 'core.emoji', name: 'Emoji', icon: '😀', group: 'Einfügen', description: 'Emoji oder eigenes Emoji in den Text einfügen', keywords: ['emoji', 'smiley', 'symbol', 'icon', 'eigene'],
+      run: (editor, { blockId }) => {
+        const el = editor.mainEditable(blockId);
+        if (!el) return;
+        el.focus();
+        const sel = window.getSelection();
+        const range = sel.rangeCount ? sel.getRangeAt(0).cloneRange() : null;
+        const rect = range?.getBoundingClientRect();
+        const anchor = { getBoundingClientRect: () => (rect && rect.height ? rect : el.getBoundingClientRect()) };
+        emojiPicker(anchor, (em) => {
+          if (!em) return;
+          el.focus();
+          if (range) { sel.removeAllRanges(); sel.addRange(range); }
+          if (CUSTOM_RE.test(em)) document.execCommand('insertHTML', false, customEmojiHtml(CUSTOM_RE.exec(em)[1]) + '\u200b');
+          else document.execCommand('insertText', false, em);
+        }, { remove: false });
+      }
+    });
     this.registry.registerSlashCommand({
       id: 'core.subpage', name: 'Unterseite', icon: 'files', group: 'Einfügen', description: 'Neue Seite innerhalb dieser Seite (wie ein Unterordner)', keywords: ['seite', 'unterseite', 'page', 'subpage', 'doku', 'ordner', 'kapitel'],
       run: async (editor, { blockId }) => {

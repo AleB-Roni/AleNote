@@ -2,6 +2,7 @@
 // Eine Notiz besteht aus Blöcken: { id, type, data, indent?, color? }
 // und frei beweglichen Bildern (floats): { id, src, x, y, w, rot, z }
 
+import { emojiNode } from '../core/emoji.js';
 import { h, uid, debounce, setPath, placeCaret, setCaretOffset, getCaretOffset, isCaretAtStart, isCaretAtEnd,
   isCaretOnFirstLine, isCaretOnLastLine, splitAtCaret, isEmptyHtml, getCaretClientRect, sanitizeHtml, clamp, stripHtml, copyText } from '../core/utils.js';
 import { History } from '../core/history.js';
@@ -79,7 +80,7 @@ export class Editor {
 
     this.page = h('div.page' + (note.cover ? '.has-cover' : ''));
     const header = h('div.page-header');
-    if (note.icon) header.append(h('button.note-icon', { text: note.icon, title: 'Icon ändern', onclick: (e) => this.pickIcon(e.currentTarget) }));
+    if (note.icon) header.append(h('button.note-icon', { title: 'Icon ändern', onclick: (e) => this.pickIcon(e.currentTarget) }, emojiNode(note.icon)));
     const actions = h('div.page-header-actions', {},
       !note.icon ? h('button.chip.ghost', { onclick: (e) => this.pickIcon(e.currentTarget) }, '😀', 'Icon hinzufügen') : null,
       !note.cover ? h('button.chip.ghost', { onclick: () => { note.cover = { type: 'gradient', value: Object.keys(GRADIENTS)[Math.floor(Math.random() * 6)] }; this.changed(true); this.renderAll(); } }, icon('image', 14), 'Titelbild') : null);
@@ -1155,7 +1156,8 @@ export class Editor {
       this.note.icon = emoji || '';
       this.changed(true);
       this.renderAll();
-      this.app.sidebar.refresh();
+      // erst speichern, damit die Seitenleiste das neue Icon schon sieht
+      Promise.resolve(this.app.saveNow()).finally(() => { this.app.sidebar.refresh(); this.app.updateChrome(); });
     });
   }
 

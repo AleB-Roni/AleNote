@@ -52,6 +52,8 @@ notizen.example.de {
 }
 ```
 
+**Live-Bearbeitung über den Proxy:** Die Live-Verbindung nutzt Server-Sent Events (`/api/live`). Der Server schickt dafür `X-Accel-Buffering: no` und alle 25 Sekunden ein Lebenszeichen – bei Nginx/Nginx Proxy Manager und Caddy funktioniert das ohne weitere Einstellungen. Falls Änderungen trotzdem erst verzögert ankommen: im Proxy für diesen Host das Puffern abschalten (`proxy_buffering off;`).
+
 Für **Unraid** gibt es ein fertiges Template, siehe [`../unraid/README.md`](../unraid/README.md).
 
 Alternativ mit Docker:

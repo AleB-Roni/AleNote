@@ -3,6 +3,7 @@
 // Umbenennen/Verschieben automatisch nachgezogen (siehe core/pages.js).
 import { h } from '../core/utils.js';
 import { icon } from '../ui/icons.js';
+import { emojiNode } from '../core/emoji.js';
 
 export default function registerPageBlock(registry) {
   registry.registerBlock({
@@ -18,7 +19,7 @@ export default function registerPageBlock(registry) {
       return h('button.page-link', {
         contenteditable: 'false', title: 'Seite öffnen',
         onclick: () => ctx.app.openNote(note.path)
-      }, note.icon ? h('span.page-link-emoji', { text: note.icon }) : icon(kids ? 'files' : 'file', 17, 'page-link-icon'),
+      }, note.icon ? h('span.page-link-emoji', {}, emojiNode(note.icon)) : icon(kids ? 'files' : 'file', 17, 'page-link-icon'),
       h('span.page-link-title', { text: note.name }),
       kids ? h('span.page-link-count', { text: `${kids} ${kids === 1 ? 'Unterseite' : 'Unterseiten'}` }) : null,
       icon('chevronRight', 15, 'page-link-arrow'));

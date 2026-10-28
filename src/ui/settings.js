@@ -1,4 +1,5 @@
 // Einstellungen: Darstellung, Editor, Hotkeys, Plugins, Vault
+import { plainIcon } from '../core/emoji.js';
 import { h } from '../core/utils.js';
 import { renderAISettings } from '../ai/ai-settings.js';
 import { quickSettings } from '../core/todos.js';
@@ -261,7 +262,7 @@ function quick(app, page, rerender) {
 
   page.append(section('Schnellnotiz', 'Ein kleines Fenster zum schnellen Festhalten. Jeder Eintrag landet mit Datum und Uhrzeit in deiner Quicknotizen-Notiz – auf Wunsch als To-do mit Fälligkeitsdatum.'));
   const notes = app.sidebar.allNotes();
-  const opts = notes.map((n) => [n.path, (n.icon ? n.icon + ' ' : '') + n.path.replace(/\.alenote$/, '')]);
+  const opts = notes.map((n) => [n.path, (n.icon ? plainIcon(n.icon) + ' ' : '') + n.path.replace(/\.alenote$/, '')]);
   if (!opts.some(([p]) => p === qs.target)) opts.unshift([qs.target, qs.target.replace(/\.alenote$/, '') + ' (wird angelegt)']);
   page.append(row('Ziel-Notiz', 'Standard für neue Einträge. Im Schnellnotiz-Fenster kannst du jedes Mal eine andere wählen.', select(opts, qs.target, (v) => set({ target: v }))));
   page.append(row('Neue Einträge', null, select([['bottom', 'Unten anhängen (chronologisch)'], ['top', 'Oben einfügen (neueste zuerst)']], qs.order, (v) => set({ order: v }))));

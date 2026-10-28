@@ -1,6 +1,6 @@
 {
   "name": "alenote-server",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "AleNote Sync-Server mit Benutzerverwaltung und Admin-Konsole",
   "main": "server.js",
   "license": "MIT",

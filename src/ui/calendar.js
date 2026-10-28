@@ -21,6 +21,7 @@ async function loadFeed(app, feed, force) {
     return r;
   }
 }
+import { plainIcon } from '../core/emoji.js';
 import { h, uid } from '../core/utils.js';
 import { icon } from './icons.js';
 import { toast, modal, popover, confirmDialog } from './overlays.js';
@@ -301,7 +302,7 @@ export class CalendarView {
     return h('div.cal-task' + (t.checked ? '.done' : ''), {}, check,
       h('div.cal-task-body', {},
         h('div.cal-task-text', { text: t.text || '(ohne Text)', onclick: () => this.openTodo(t) }),
-        h('div.cal-task-meta', {}, h('button.link-btn', { onclick: () => this.openTodo(t) }, (t.icon || '📄') + ' ' + t.note), dateBtn)));
+        h('div.cal-task-meta', {}, h('button.link-btn', { onclick: () => this.openTodo(t) }, (plainIcon(t.icon, '📄') || '📄') + ' ' + t.note), dateBtn)));
   }
 
   // ---------- Listenansicht (Agenda) ----------

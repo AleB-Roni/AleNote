@@ -1,4 +1,5 @@
 // Befehlspalette (Strg+P): Notizen öffnen, Volltextsuche, Befehle & eigene Hotkeys ausführen
+import { emojiNode } from '../core/emoji.js';
 import { h, debounce, escapeHtml } from '../core/utils.js';
 import { icon } from './icons.js';
 import { shortcutHtml } from '../core/shortcuts.js';
@@ -112,7 +113,7 @@ export class CommandPalette {
       for (const it of s.items) {
         const idx = i++;
         const row = h('div.palette-item' + (idx === this.active ? '.active' : ''), { dataset: { index: idx } },
-          it.emoji ? h('span.palette-emoji', { text: it.emoji }) : icon(it.icon, 16),
+          it.emoji ? h('span.palette-emoji', {}, emojiNode(it.emoji)) : icon(it.icon, 16),
           h('div.palette-text', {},
             h('div.palette-name', { text: it.name }),
             it.snippetHtml ? h('div.palette-desc', { html: it.snippetHtml }) : it.description ? h('div.palette-desc', { text: it.description }) : null),

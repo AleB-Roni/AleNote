@@ -31,6 +31,41 @@ function checkPath(p, kind) {
   return p;
 }
 
+/** Block-Änderungen auf eine Notiz anwenden (siehe Vault.patchNote) */
+function applyPatch(note, patch) {
+  const old = Array.isArray(note.blocks) ? note.blocks : [];
+  const map = new Map(old.map((b) => [b.id, b]));
+  for (const [id, b] of Object.entries(patch.blocks || {})) {
+    if (b && typeof b === 'object') map.set(id, { ...b, id }); else map.delete(id);
+  }
+  let ids;
+  if (Array.isArray(patch.order)) {
+    ids = patch.order.filter((id, i, a) => map.has(id) && a.indexOf(id) === i);
+    // Blöcke, die ein anderes Gerät inzwischen angelegt hat, hinter ihrem Vorgänger einordnen
+    const placed = new Set(ids);
+    let prev = null;
+    for (const b of old) {
+      if (!map.has(b.id)) continue;
+      if (!placed.has(b.id)) {
+        const at = prev ? ids.indexOf(prev) + 1 : 0;
+        ids.splice(at, 0, b.id);
+        placed.add(b.id);
+      }
+      prev = b.id;
+    }
+    for (const id of map.keys()) if (!placed.has(id)) ids.push(id);
+  } else {
+    ids = old.filter((b) => map.has(b.id)).map((b) => b.id);
+    for (const id of map.keys()) if (!ids.includes(id)) ids.push(id);
+  }
+  note.blocks = ids.map((id) => map.get(id));
+  for (const [k, v] of Object.entries(patch.meta || {})) {
+    if (k === 'blocks' || k === 'updated') continue;
+    if (v === null) delete note[k]; else note[k] = v;
+  }
+  return note;
+}
+
 class Vault {
   constructor(root, userId) {
     this.dir = path.join(root, userId);
@@ -135,34 +170,64 @@ class Vault {
    * Schreibt eine Notiz oder ein Asset.
    * baseRev muss der Version auf dem Server entsprechen, sonst Konflikt (409) – außer force=true.
    */
-  write(kind, p, buf, { baseRev = 0, force = false, quotaBytes = 0 } = {}) {
+  write(kind, p, buf, opts = {}) {
     checkPath(p, kind);
+    return this.lock(() => this.writeLocked(kind, p, buf, opts));
+  }
+
+  async writeLocked(kind, p, buf, { baseRev = 0, force = false, quotaBytes = 0 } = {}) {
+    const idx = await this.index.load();
+    const cur = idx.items[p];
+    const curRev = cur ? cur.rev : 0;
+    const hash = hashOf(buf);
+    if (cur && !cur.deleted && cur.hash === hash && cur.kind === kind) return { path: p, ...cur, unchanged: true };
+    // Eine gelöschte Notiz neu anzulegen (baseRev 0, z.B. aus dem Papierkorb) ist kein Konflikt
+    const recreate = cur?.deleted && baseRev === 0;
+    if (!force && kind !== 'asset' && baseRev !== curRev && !recreate) {
+      const e = httpError(409, 'Konflikt: Auf dem Server gibt es eine neuere Version');
+      e.extra = { current: cur ? { path: p, ...cur } : null };
+      throw e;
+    }
+    if (quotaBytes) {
+      const { bytes } = await this.usage();
+      if (bytes - (cur && !cur.deleted ? cur.size || 0 : 0) + buf.length > quotaBytes) throw httpError(413, 'Speicherplatz-Kontingent überschritten');
+    }
+    const file = this.fileFor(kind, p);
+    if (kind === 'note') await this.keepVersion(p, cur, buf);
+    await fs.mkdir(path.dirname(file), { recursive: true });
+    await fs.writeFile(file + '.tmp', buf);
+    await fs.rename(file + '.tmp', file);
+    idx.seq++;
+    idx.items[p] = { kind, rev: curRev + 1, hash, seq: idx.seq, updated: Date.now(), size: buf.length, deleted: false };
+    await this.index.save();
+    return { path: p, ...idx.items[p] };
+  }
+
+  /**
+   * Live-Bearbeitung: Block-Änderungen in die gespeicherte Notiz einarbeiten (pro Block gewinnt
+   * die letzte Änderung). Alle Geräte schicken ihre Änderungen hierher, der Server legt die
+   * Reihenfolge fest – so landen alle beim gleichen Stand.
+   * patch: { blocks: { id: block | null }, order?: [ids], meta?: { key: value | null }, full?: note }
+   */
+  patchNote(p, patch, { quotaBytes = 0 } = {}) {
+    checkPath(p, 'note');
     return this.lock(async () => {
       const idx = await this.index.load();
       const cur = idx.items[p];
-      const curRev = cur ? cur.rev : 0;
-      const hash = hashOf(buf);
-      if (cur && !cur.deleted && cur.hash === hash && cur.kind === kind) return { path: p, ...cur, unchanged: true };
-      // Eine gelöschte Notiz neu anzulegen (baseRev 0, z.B. aus dem Papierkorb) ist kein Konflikt
-      const recreate = cur?.deleted && baseRev === 0;
-      if (!force && kind !== 'asset' && baseRev !== curRev && !recreate) {
-        const e = httpError(409, 'Konflikt: Auf dem Server gibt es eine neuere Version');
-        e.extra = { current: cur ? { path: p, ...cur } : null };
-        throw e;
+      let note;
+      if (cur && !cur.deleted && cur.kind === 'note') {
+        try { note = JSON.parse(await fs.readFile(this.fileFor('note', p), 'utf8')); } catch { note = null; }
       }
-      if (quotaBytes) {
-        const { bytes } = await this.usage();
-        if (bytes - (cur && !cur.deleted ? cur.size || 0 : 0) + buf.length > quotaBytes) throw httpError(413, 'Speicherplatz-Kontingent überschritten');
+      if (!note) {
+        if (!patch.full || typeof patch.full !== 'object') throw httpError(404, 'Notiz noch nicht auf dem Server');
+        note = patch.full;
+      } else {
+        applyPatch(note, patch);
       }
-      const file = this.fileFor(kind, p);
-      if (kind === 'note') await this.keepVersion(p, cur, buf);
-      await fs.mkdir(path.dirname(file), { recursive: true });
-      await fs.writeFile(file + '.tmp', buf);
-      await fs.rename(file + '.tmp', file);
-      idx.seq++;
-      idx.items[p] = { kind, rev: curRev + 1, hash, seq: idx.seq, updated: Date.now(), size: buf.length, deleted: false };
-      await this.index.save();
-      return { path: p, ...idx.items[p] };
+      note.updated = Date.now();
+      const content = JSON.stringify(note, null, 2);
+      const res = await this.writeLocked('note', p, Buffer.from(content, 'utf8'), { force: true, quotaBytes });
+      return { ...res, content };
     });
   }
 
@@ -204,4 +269,4 @@ class Vault {
   }
 }
 
-module.exports = { Vault, checkPath };
+module.exports = { Vault, checkPath, applyPatch };
